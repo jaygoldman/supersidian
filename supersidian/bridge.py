@@ -260,6 +260,29 @@ def apply_replacements(text: str, repl: dict[str, str]) -> str:
     return pattern.sub(_sub, text)
 
 
+def write_status_note(bridge: BridgeConfig, notes_found: int, converted: int, skipped: int, no_text: int) -> None:
+    """Write or update a status note in the vault root for this bridge."""
+    status_path = bridge.vault_path / f"Supersidian Status - {bridge.name}.md"
+    now = datetime.datetime.now().isoformat(timespec="seconds")
+
+    lines = [
+        f"# Supersidian Status - {bridge.name}",
+        "",
+        f"- Last run: {now}",
+        f"- Supernote path: `{bridge.supernote_path}`",
+        f"- Vault path: `{bridge.vault_path}`",
+        "",
+        "## Summary",
+        f"- Notes found: {notes_found}",
+        f"- Converted this run: {converted}",
+        f"- Skipped (up-to-date): {skipped}",
+        f"- No text extracted: {no_text}",
+    ]
+
+    status_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    log.info(f"[{bridge.name}] status updated at {status_path}")
+
+
 def sanitize_title(s: str) -> str:
     s = s.strip()
     s = re.sub(r"[\r\n]+", " ", s)
@@ -273,17 +296,17 @@ def build_tags(default_tags: Iterable[str], extra_tags: Iterable[str]) -> str:
     return "[" + ", ".join(tags) + "]" if tags else "[]"
 
 
-def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> None:
+def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
     rel = note.relative_to(bridge.supernote_path)
     md_path = bridge.vault_path / rel.with_suffix(".md")
 
     if md_path.exists() and md_path.stat().st_mtime >= note.stat().st_mtime:
-        return
+        return "skipped_up_to_date"
 
     txt = extract_text(note)
     if not txt:
         log.warning(f"[{bridge.name}] no text extracted for {rel}")
-        return
+        return "no_text"
 
     md_body = unwrap_and_markdown(txt, aggressive=getattr(bridge, "aggressive_cleanup", False))
 
@@ -311,6 +334,7 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> None:
 
     md_path.write_text("\n".join(frontmatter) + md_body, encoding="utf-8")
     log.info(f"[{bridge.name}] OK {rel} → {md_path}")
+    return "converted"
 
 
 def process_bridge(bridge: BridgeConfig) -> None:
@@ -331,8 +355,20 @@ def process_bridge(bridge: BridgeConfig) -> None:
         log.info(f"[{bridge.name}] no .note files under {bridge.supernote_path}")
         return
 
+    converted = 0
+    skipped = 0
+    no_text = 0
+
     for note in notes:
-        process_note_for_bridge(note, bridge)
+        status = process_note_for_bridge(note, bridge)
+        if status == "converted":
+            converted += 1
+        elif status == "skipped_up_to_date":
+            skipped += 1
+        elif status == "no_text":
+            no_text += 1
+
+    write_status_note(bridge, notes_found=len(notes), converted=converted, skipped=skipped, no_text=no_text)
 
 
 def main() -> None:

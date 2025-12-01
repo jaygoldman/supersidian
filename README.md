@@ -296,15 +296,6 @@ Example:
 Every run loads this note and applies the corrections.
 
 ---
-## 🧪 Roadmap / Future Ideas
-
-- Local spellchecking with custom dictionaries
-- LLM-assisted formatting cleanup
-- Healthchecks + sync status notes
-- Launch agent for automatic timed processing
-- Support for PNG-based OCR fallback
-
----
 ## 📜 License
 
 MIT — use freely, improve freely, share freely.
