@@ -14,6 +14,25 @@ import tempfile
 
 from .config import load_config, BridgeConfig
 
+import logging
+import os
+
+# Determine verbose mode from environment variable SUPERSIDIAN_VERBOSE
+VERBOSE = os.environ.get("SUPERSIDIAN_VERBOSE", "0") == "1"
+
+LOG_PATH = Path.home() / ".supersidian.log"
+
+logging.basicConfig(
+    level=logging.DEBUG if VERBOSE else logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_PATH, encoding="utf-8"),
+        logging.StreamHandler() if VERBOSE else logging.NullHandler()
+    ]
+)
+
+log = logging.getLogger("supersidian")
+
 
 BULLET_CHARS = "•–—*-+·►"
 
@@ -51,7 +70,7 @@ def load_replacements(vault_path: Path) -> dict[str, str]:
                 if wrong:
                     repl[wrong] = right
     except Exception as e:
-        print(f"[WARN] failed to load replacements from {cfg_path}: {e}")
+        log.warning(f"Failed to load replacements from {cfg_path}: {e}")
     return repl
 
 
@@ -75,11 +94,11 @@ def extract_text(note_path: Path) -> Optional[str]:
             check=True,
         )
     except FileNotFoundError:
-        print(f"[ERR] supernote-tool not found on PATH; cannot extract text for {note_path}")
+        log.error(f"supernote-tool not found on PATH; cannot extract text for {note_path}")
         return None
     except subprocess.CalledProcessError as e:
         msg = e.stderr.strip() if e.stderr else str(e)
-        print(f"[ERR] supernote-tool failed for {note_path}: {msg}")
+        log.error(f"supernote-tool failed for {note_path}: {msg}")
         return None
 
     # Read the temporary output file
@@ -263,7 +282,7 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> None:
 
     txt = extract_text(note)
     if not txt:
-        print(f"[{bridge.name}] [WARN] no text extracted for {rel}")
+        log.warning(f"[{bridge.name}] no text extracted for {rel}")
         return
 
     md_body = unwrap_and_markdown(txt, aggressive=getattr(bridge, "aggressive_cleanup", False))
@@ -291,25 +310,25 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> None:
     ]
 
     md_path.write_text("\n".join(frontmatter) + md_body, encoding="utf-8")
-    print(f"[{bridge.name}] [OK] {rel} → {md_path}")
+    log.info(f"[{bridge.name}] OK {rel} → {md_path}")
 
 
 def process_bridge(bridge: BridgeConfig) -> None:
     if not bridge.enabled:
-        print(f"[{bridge.name}] [SKIP] disabled")
+        log.info(f"[{bridge.name}] SKIP disabled")
         return
 
     if not bridge.supernote_path.exists():
-        print(f"[{bridge.name}] [WARN] supernote_path does not exist: {bridge.supernote_path}")
+        log.warning(f"[{bridge.name}] supernote_path does not exist: {bridge.supernote_path}")
         return
 
     if not bridge.vault_path.exists():
-        print(f"[{bridge.name}] [WARN] vault_path does not exist: {bridge.vault_path}")
+        log.warning(f"[{bridge.name}] vault_path does not exist: {bridge.vault_path}")
         return
 
     notes = list(bridge.supernote_path.rglob("*.note"))
     if not notes:
-        print(f"[{bridge.name}] [INFO] no .note files under {bridge.supernote_path}")
+        log.info(f"[{bridge.name}] no .note files under {bridge.supernote_path}")
         return
 
     for note in notes:
