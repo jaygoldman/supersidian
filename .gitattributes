@@ -1,0 +1,28 @@
+# --- Python Virtual Environment ---
+.venv/
+
+# --- Environment Variables ---
+.env
+.env.*
+
+# --- Local Config (user-specific, not for Git) ---
+supersidian.config.json
+
+# --- macOS System Files ---
+.DS_Store
+
+# --- Python Bytecode ---
+__pycache__/
+*.pyc
+
+# --- VS Code / JetBrains Editors ---
+.vscode/
+.idea/
+
+# --- Python Build Artifacts ---
+build/
+dist/
+*.egg-info/
+
+# --- Logs ---
+*.log

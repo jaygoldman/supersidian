@@ -1,0 +1,25 @@
+{
+  "bridges": [
+    {
+      "name": "vault_name_1_here",
+      "enabled": true,
+      "supernote_subdir": "supernote_subdir_name_here",
+      "vault_path": "/Users/your-username/Obsidian/vault_name_1_here",
+      "extra_tags": ["tag1"]
+    },
+    {
+      "name": "vault_name_2_here",
+      "enabled": false,
+      "supernote_subdir": "supernote_subdir_name_here",
+      "vault_path": "/Users/your-username/Obsidian/vault_name_2_here",
+      "extra_tags": ["tag2"]
+    },
+    {
+      "name": "vault_name_3_here",
+      "enabled": false,
+      "supernote_subdir": "supernote_subdir_name_here",
+      "vault_path": "/Users/your-username/Obsidian/vault_name_3_here",
+      "extra_tags": ["tag3"]
+    }
+  ]
+}
