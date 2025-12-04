@@ -74,7 +74,7 @@ Supersidian:
 Inside your vault, create: 
 
 ```
-Supersidian Replacements.md
+Supersidian/Replacements - <bridge>.md
 ```
 
 Add corrections:
@@ -277,7 +277,7 @@ If you later *move* a note inside Obsidian, and then update the corresponding `.
 Users maintain their own correction list directly inside their vault:
 
 ```
-Supersidian Replacements.md
+Supersidian/Replacements - <bridge>.md
 ```
 
 This enables:
@@ -294,6 +294,198 @@ Example:
 ```
 
 Every run loads this note and applies the corrections.
+
+---
+## 📊 Supersidian Status Notes
+
+On every run, Supersidian generates a status report *inside your Obsidian vault* for each enabled bridge. The note is named:
+
+```
+Supersidian/Status - <bridge name>.md
+```
+
+For example, for a bridge named `klick`:
+
+```
+Obsidian/Klick/Supersidian/Status - klick.md
+```
+
+### What the status note contains
+Each run overwrites the status note with an updated summary:
+
+- Last run timestamp
+- Supernote source path
+- Obsidian vault path
+- Total notes found
+- Notes converted on this run
+- Notes skipped (already up to date)
+- Notes with no extractable text
+
+Example:
+
+```
+# Supersidian Status - klick
+
+- Last run: 2025‑12‑01T22:34:56
+- Supernote path: `/Users/.../Dropbox/Supernote/Note/Klick`
+- Vault path: `/Users/.../Obsidian/Klick`
+
+## Summary
+- Notes found: 23
+- Converted this run: 2
+- Skipped (up‑to‑date): 21
+- No text extracted: 0
+```
+
+### Why this exists
+This gives you real‑time visibility:
+- whether Supersidian ran successfully
+- whether Dropbox or Supernote failed to sync
+- whether extraction succeeded
+- which notes were updated
+
+It allows monitoring directly inside Obsidian without reading log files.
+
+---
+## 🖼️ Sketch & Image Export (Optional)
+
+Supersidian can optionally extract **sketches and drawings** from your Supernote pages by exporting them as PNG images and embedding them in the generated Markdown.
+
+This feature is **disabled by default**. Enable it per-bridge in your `supersidian.config.json`:
+
+```json
+{
+  "name": "klick",
+  "enabled": true,
+  "supernote_subdir": "Klick",
+  "vault_path": "/Users/you/Obsidian/Klick",
+  "export_images": true,
+  "images_subdir": "Supersidian/Assets"
+}
+```
+
+### Where images are stored
+
+Images are written into the vault under:
+
+```
+Supersidian/Assets/<bridge>/<note-stem>/page-*.png
+```
+
+Example:
+
+```
+Obsidian/Klick/Supersidian/Assets/klick/20251201_103300/page-1.png
+```
+
+### How images appear in your Markdown
+
+When images are exported, Supersidian appends a `## Sketches` section to the end of the note:
+
+```md
+## Sketches
+
+![page-1](Supersidian/Assets/klick/20251201_103300/page-1.png)
+![page-2](Supersidian/Assets/klick/20251201_103300/page-2.png)
+```
+
+If no images are exported (e.g., the note contains no sketches), the section is omitted automatically.
+
+```
+```
+
+---
+## 🔔 Notifications & Webhook Integration
+
+Supersidian can optionally send notifications when something goes wrong during a run.  
+If a webhook URL is provided, Supersidian will POST a JSON payload describing the errors.
+
+### Enabling Notifications
+
+Set an environment variable in your `.env` file:
+
+```
+SUPERSIDIAN_WEBHOOK_URL=https://your-webhook-endpoint
+```
+
+This can be any HTTP endpoint that accepts JSON:
+- ntfy.sh
+- a Slack/Discord relay
+- IFTTT or Zapier webhook endpoints
+- a custom server or home‑automation rule
+
+If `SUPERSIDIAN_WEBHOOK_URL` is **not** set, notifications are disabled.
+
+### What triggers a notification?
+
+A webhook is sent only if **any errors occur**:
+
+- Supernote folder is missing
+- Vault folder is missing
+- `supernote-tool` is missing
+- `supernote-tool` fails on one or more notes
+- A note contains no extractable Real‑Time Recognition text
+
+Clean runs (all converted or skipped) do **not** trigger notifications.
+
+### JSON Payload Format
+
+Supersidian sends a POST request with the following structure:
+
+```json
+{
+  "bridge": "klick",
+  "timestamp": "2025-12-01T22:34:56",
+  "notes_found": 23,
+  "converted": 2,
+  "skipped": 21,
+  "no_text": 1,
+  "tool_missing": 0,
+  "tool_failed": 1,
+  "supernote_missing": false,
+  "vault_missing": false
+}
+```
+
+This provides enough detail for dashboards, alerts, or automation responses.
+
+### Example: ntfy.sh
+
+Add this to `.env`:
+
+```
+SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/supersidian-alerts
+```
+
+Then subscribe from any device:
+
+```
+curl -s https://ntfy.sh/supersidian-alerts/json
+```
+
+You will receive real‑time alerts like:
+
+```
+{"bridge":"klick","converted":2,"no_text":1,"tool_failed":1,"timestamp":"2025‑12‑01T22:34:56"}
+```
+
+### Example: Local Script Trigger
+
+If you want Supersidian to trigger a local script instead of a network webhook, use a tiny local HTTP listener such as:
+
+```
+python3 -m http.server 9000
+```
+
+Then set:
+
+```
+SUPERSIDIAN_WEBHOOK_URL=http://localhost:9000
+```
+
+Your script can then respond however you prefer.
+
+Notifications allow you to monitor sync reliability even when Supersidian runs unattended (e.g., as a scheduled job).
 
 ---
 ## 📜 License

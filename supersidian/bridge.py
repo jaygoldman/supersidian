@@ -17,8 +17,13 @@ from .config import load_config, BridgeConfig
 import logging
 import os
 
+import json
+import urllib.request
+import urllib.error
+
 # Determine verbose mode from environment variable SUPERSIDIAN_VERBOSE
 VERBOSE = os.environ.get("SUPERSIDIAN_VERBOSE", "0") == "1"
+WEBHOOK_URL = os.environ.get("SUPERSIDIAN_WEBHOOK_URL")
 
 LOG_PATH = Path.home() / ".supersidian.log"
 
@@ -38,10 +43,10 @@ BULLET_CHARS = "•–—*-+·►"
 
 
 @lru_cache(maxsize=None)
-def load_replacements(vault_path: Path) -> dict[str, str]:
-    """Load per-vault replacements from a Markdown note in the vault root.
+def load_replacements(vault_path: Path, bridge_name: str) -> dict[str, str]:
+    """Load per-vault replacements from a Markdown note in the Supersidian subfolder.
 
-    File path: <vault>/Supersidian Replacements.md
+    File path: <vault>/Supersidian/Replacements - <bridge>.md
 
     File format (inside the note):
         # comment lines start with '#'
@@ -51,7 +56,7 @@ def load_replacements(vault_path: Path) -> dict[str, str]:
 
     Any leading markdown list marker is stripped before parsing."""
     repl: dict[str, str] = {}
-    cfg_path = vault_path / "Supersidian Replacements.md"
+    cfg_path = vault_path / "Supersidian" / f"Replacements - {bridge_name}.md"
     if not cfg_path.exists():
         return repl
 
@@ -74,6 +79,12 @@ def load_replacements(vault_path: Path) -> dict[str, str]:
     return repl
 
 
+class ExtractionError(Exception):
+    def __init__(self, kind: str, message: str):
+        self.kind = kind
+        super().__init__(message)
+
+
 def extract_text(note_path: Path) -> Optional[str]:
     # Use a temporary file because supernote-tool's txt output is designed for file targets
     try:
@@ -94,12 +105,13 @@ def extract_text(note_path: Path) -> Optional[str]:
             check=True,
         )
     except FileNotFoundError:
-        log.error(f"supernote-tool not found on PATH; cannot extract text for {note_path}")
-        return None
+        msg = f"supernote-tool not found on PATH; cannot extract text for {note_path}"
+        log.error(msg)
+        raise ExtractionError("tool_missing", msg)
     except subprocess.CalledProcessError as e:
         msg = e.stderr.strip() if e.stderr else str(e)
         log.error(f"supernote-tool failed for {note_path}: {msg}")
-        return None
+        raise ExtractionError("tool_failed", msg)
 
     # Read the temporary output file
     try:
@@ -260,9 +272,20 @@ def apply_replacements(text: str, repl: dict[str, str]) -> str:
     return pattern.sub(_sub, text)
 
 
-def write_status_note(bridge: BridgeConfig, notes_found: int, converted: int, skipped: int, no_text: int) -> None:
-    """Write or update a status note in the vault root for this bridge."""
-    status_path = bridge.vault_path / f"Supersidian Status - {bridge.name}.md"
+def write_status_note(
+    bridge: BridgeConfig,
+    notes_found: int,
+    converted: int,
+    skipped: int,
+    no_text: int,
+    tool_missing: int = 0,
+    tool_failed: int = 0,
+    supernote_missing: bool = False,
+) -> None:
+    """Write or update a status note in the Supersidian subfolder for this bridge."""
+    sup_dir = bridge.vault_path / "Supersidian"
+    status_path = sup_dir / f"Status - {bridge.name}.md"
+    sup_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.datetime.now().isoformat(timespec="seconds")
 
     lines = [
@@ -279,9 +302,125 @@ def write_status_note(bridge: BridgeConfig, notes_found: int, converted: int, sk
         f"- No text extracted: {no_text}",
     ]
 
+    errors: list[str] = []
+
+    if supernote_missing:
+        errors.append("Supernote path does not exist at last run.")
+    if tool_missing:
+        errors.append(f"supernote-tool missing for {tool_missing} note(s).")
+    if tool_failed:
+        errors.append(f"supernote-tool failed for {tool_failed} note(s).")
+    if no_text and not (tool_missing or tool_failed):
+        errors.append(f"No text extracted for {no_text} note(s).")
+
+    if errors:
+        lines.append("")
+        lines.append("## Errors")
+        for msg in errors:
+            lines.append(f"- {msg}")
+
     status_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     log.info(f"[{bridge.name}] status updated at {status_path}")
 
+
+def send_notification(
+    bridge: BridgeConfig,
+    notes_found: int,
+    converted: int,
+    skipped: int,
+    no_text: int,
+    tool_missing: int,
+    tool_failed: int,
+    supernote_missing: bool,
+    vault_missing: bool,
+) -> None:
+    if not WEBHOOK_URL:
+        return
+
+    now = datetime.datetime.now().isoformat(timespec="seconds")
+    payload = {
+        "bridge": bridge.name,
+        "timestamp": now,
+        "notes_found": notes_found,
+        "converted": converted,
+        "skipped": skipped,
+        "no_text": no_text,
+        "tool_missing": tool_missing,
+        "tool_failed": tool_failed,
+        "supernote_missing": supernote_missing,
+        "vault_missing": vault_missing,
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        WEBHOOK_URL,
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            log.info(f"[{bridge.name}] notification sent (status={getattr(resp, 'status', 'unknown')})")
+    except Exception as e:
+        log.warning(f"[{bridge.name}] failed to send notification to {WEBHOOK_URL}: {e}")
+
+
+def export_images(note_path: Path, bridge: BridgeConfig) -> list[Path]:
+    """Export PNG images for a Supernote .note file into the vault.
+
+    Images are written under:
+        <vault>/<images_subdir>/<bridge.name>/<note-stem>/
+
+    Returns a list of PNG paths (possibly empty on failure).
+    """
+    if not getattr(bridge, "export_images", False):
+        return []
+
+    # Determine base assets root (configurable, with a default)
+    images_subdir = getattr(bridge, "images_subdir", "Supersidian/Assets")
+    base_assets_root = bridge.vault_path / images_subdir
+    assets_root = base_assets_root / bridge.name
+
+    # One folder per note, using the note's stem
+    note_dir = assets_root / note_path.stem
+    note_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = subprocess.run(
+            [
+                "supernote-tool",
+                "convert",
+                "-t",
+                "png",
+                "-a",
+                str(note_path),
+                str(note_dir),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        log.debug(
+            f"[{bridge.name}] image export for {note_path} -> {note_dir} "
+            f"(stdout={result.stdout.strip()!r})"
+        )
+    except FileNotFoundError:
+        msg = f"supernote-tool not found on PATH; cannot export images for {note_path}"
+        log.error(msg)
+        # Do not raise; failure to export images should not block text notes.
+        return []
+    except subprocess.CalledProcessError as e:
+        msg = e.stderr.strip() if e.stderr else str(e)
+        log.error(f"[{bridge.name}] supernote-tool PNG export failed for {note_path}: {msg}")
+        return []
+
+    pngs = sorted(note_dir.glob("*.png"))
+    if not pngs:
+        log.warning(f"[{bridge.name}] no PNG pages exported for {note_path} into {note_dir}")
+    else:
+        log.info(f"[{bridge.name}] exported {len(pngs)} page image(s) for {note_path} into {note_dir}")
+
+    return pngs
 
 def sanitize_title(s: str) -> str:
     s = s.strip()
@@ -303,14 +442,24 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
     if md_path.exists() and md_path.stat().st_mtime >= note.stat().st_mtime:
         return "skipped_up_to_date"
 
-    txt = extract_text(note)
+    try:
+        txt = extract_text(note)
+    except ExtractionError as e:
+        if e.kind == "tool_missing":
+            return "tool_missing"
+        elif e.kind == "tool_failed":
+            return "tool_failed"
+        else:
+            log.error(f"[{bridge.name}] unknown extraction error for {rel}: {e}")
+            return "extract_error"
+
     if not txt:
         log.warning(f"[{bridge.name}] no text extracted for {rel}")
         return "no_text"
 
     md_body = unwrap_and_markdown(txt, aggressive=getattr(bridge, "aggressive_cleanup", False))
 
-    repl = load_replacements(bridge.vault_path)
+    repl = load_replacements(bridge.vault_path, bridge.name)
     if repl:
         md_body = apply_replacements(md_body, repl)
 
@@ -332,7 +481,21 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
         "",
     ]
 
-    md_path.write_text("\n".join(frontmatter) + md_body, encoding="utf-8")
+    body = md_body
+
+    # Optional: export page images for sketches/diagrams and embed them
+    image_paths: list[Path] = []
+    if getattr(bridge, "export_images", False):
+        image_paths = export_images(note, bridge)
+
+    if image_paths:
+        body += "\n\n## Sketches\n\n"
+        for img in image_paths:
+            # Make path relative to vault root for Markdown linking
+            rel_img = img.relative_to(bridge.vault_path)
+            body += f"![{img.stem}]({rel_img.as_posix()})\n"
+
+    md_path.write_text("\n".join(frontmatter) + body, encoding="utf-8")
     log.info(f"[{bridge.name}] OK {rel} → {md_path}")
     return "converted"
 
@@ -344,20 +507,65 @@ def process_bridge(bridge: BridgeConfig) -> None:
 
     if not bridge.supernote_path.exists():
         log.warning(f"[{bridge.name}] supernote_path does not exist: {bridge.supernote_path}")
+        # Try to write a status note if the vault exists
+        if bridge.vault_path.exists():
+            write_status_note(
+                bridge,
+                notes_found=0,
+                converted=0,
+                skipped=0,
+                no_text=0,
+                tool_missing=0,
+                tool_failed=0,
+                supernote_missing=True,
+            )
+        # Notify if configured
+        send_notification(
+            bridge,
+            notes_found=0,
+            converted=0,
+            skipped=0,
+            no_text=0,
+            tool_missing=0,
+            tool_failed=0,
+            supernote_missing=True,
+            vault_missing=not bridge.vault_path.exists(),
+        )
         return
 
     if not bridge.vault_path.exists():
         log.warning(f"[{bridge.name}] vault_path does not exist: {bridge.vault_path}")
+        # Cannot write a status note without a vault, but can still notify
+        send_notification(
+            bridge,
+            notes_found=0,
+            converted=0,
+            skipped=0,
+            no_text=0,
+            tool_missing=0,
+            tool_failed=0,
+            supernote_missing=False,
+            vault_missing=True,
+        )
         return
 
     notes = list(bridge.supernote_path.rglob("*.note"))
     if not notes:
         log.info(f"[{bridge.name}] no .note files under {bridge.supernote_path}")
+        write_status_note(
+            bridge,
+            notes_found=0,
+            converted=0,
+            skipped=0,
+            no_text=0,
+        )
         return
 
     converted = 0
     skipped = 0
     no_text = 0
+    tool_missing = 0
+    tool_failed = 0
 
     for note in notes:
         status = process_note_for_bridge(note, bridge)
@@ -367,8 +575,34 @@ def process_bridge(bridge: BridgeConfig) -> None:
             skipped += 1
         elif status == "no_text":
             no_text += 1
+        elif status == "tool_missing":
+            tool_missing += 1
+        elif status == "tool_failed":
+            tool_failed += 1
 
-    write_status_note(bridge, notes_found=len(notes), converted=converted, skipped=skipped, no_text=no_text)
+    write_status_note(
+        bridge,
+        notes_found=len(notes),
+        converted=converted,
+        skipped=skipped,
+        no_text=no_text,
+        tool_missing=tool_missing,
+        tool_failed=tool_failed,
+        supernote_missing=False,
+    )
+
+    if tool_missing or tool_failed or no_text:
+        send_notification(
+            bridge,
+            notes_found=len(notes),
+            converted=converted,
+            skipped=skipped,
+            no_text=no_text,
+            tool_missing=tool_missing,
+            tool_failed=tool_failed,
+            supernote_missing=False,
+            vault_missing=False,
+        )
 
 
 def main() -> None:
