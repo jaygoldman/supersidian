@@ -74,7 +74,7 @@ Supersidian:
 Inside your vault, create: 
 
 ```
-Supersidian/Replacements - <bridge>.md
+Supersidian Replacements.md
 ```
 
 Add corrections:
@@ -277,7 +277,7 @@ If you later *move* a note inside Obsidian, and then update the corresponding `.
 Users maintain their own correction list directly inside their vault:
 
 ```
-Supersidian/Replacements - <bridge>.md
+Supersidian Replacements.md
 ```
 
 This enables:
@@ -301,13 +301,13 @@ Every run loads this note and applies the corrections.
 On every run, Supersidian generates a status report *inside your Obsidian vault* for each enabled bridge. The note is named:
 
 ```
-Supersidian/Status - <bridge name>.md
+Supersidian Status - <bridge name>.md
 ```
 
 For example, for a bridge named `klick`:
 
 ```
-Obsidian/Klick/Supersidian/Status - klick.md
+Obsidian/Klick/Supersidian Status - klick.md
 ```
 
 ### What the status note contains
@@ -345,54 +345,6 @@ This gives you real‑time visibility:
 - which notes were updated
 
 It allows monitoring directly inside Obsidian without reading log files.
-
----
-## 🖼️ Sketch & Image Export (Optional)
-
-Supersidian can optionally extract **sketches and drawings** from your Supernote pages by exporting them as PNG images and embedding them in the generated Markdown.
-
-This feature is **disabled by default**. Enable it per-bridge in your `supersidian.config.json`:
-
-```json
-{
-  "name": "klick",
-  "enabled": true,
-  "supernote_subdir": "Klick",
-  "vault_path": "/Users/you/Obsidian/Klick",
-  "export_images": true,
-  "images_subdir": "Supersidian/Assets"
-}
-```
-
-### Where images are stored
-
-Images are written into the vault under:
-
-```
-Supersidian/Assets/<bridge>/<note-stem>/page-*.png
-```
-
-Example:
-
-```
-Obsidian/Klick/Supersidian/Assets/klick/20251201_103300/page-1.png
-```
-
-### How images appear in your Markdown
-
-When images are exported, Supersidian appends a `## Sketches` section to the end of the note:
-
-```md
-## Sketches
-
-![page-1](Supersidian/Assets/klick/20251201_103300/page-1.png)
-![page-2](Supersidian/Assets/klick/20251201_103300/page-2.png)
-```
-
-If no images are exported (e.g., the note contains no sketches), the section is omitted automatically.
-
-```
-```
 
 ---
 ## 🔔 Notifications & Webhook Integration

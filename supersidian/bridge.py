@@ -133,6 +133,13 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
     numbered_start = re.compile(r"^\s*\d+[\.)]\s+")
     heading_start = re.compile(r"^\s*#{1,6}\s+")
 
+    def _cap_first_letter(s: str) -> str:
+        """Capitalize the first alphabetic character in the string, leaving the rest unchanged."""
+        for i, ch in enumerate(s):
+            if ch.isalpha():
+                return s[:i] + ch.upper() + s[i+1:]
+        return s
+
     raw = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     out: list[str] = []
 
@@ -177,13 +184,41 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
             final.append(line.rstrip())
             continue
 
+        # 0) Split lines that contain "- -" (or "- --" etc.) in the middle into
+        #    a prefix line + a nested bullet line.
+        #    Example: "- Question? - -Answer" -> "- Question?" + "    - Answer"
+        mid = re.match(r"^(\s*)(.*\S)\s+-\s+(-{1,6})\s*(.*)$", line)
+        if mid:
+            base_indent, prefix, extra_hyphens, content = mid.groups()
+            # First, keep the prefix text as its own line
+            final.append(f"{base_indent}{prefix.rstrip()}")
+
+            # Then, treat the trailing "- -..." part as a nested bullet
+            level = 1 + len(extra_hyphens)  # one leading '-' implied + N extra
+            extra_indent = "    " * max(level - 1, 0)
+            text_content = _cap_first_letter(content.rstrip())
+            final.append(f"{base_indent}{extra_indent}- {text_content}")
+            continue
+
+        # 0) Handle lines like "- -text" or "- -- text" as nested bullets
+        special = re.match(r"^(\s*)-\s+(-{1,6})\s*(.*)$", line)
+        if special:
+            base_indent, extra_hyphens, content = special.groups()
+            # One leading '-' (the Supernote bullet) plus N extra hyphens => level N+1
+            level = 1 + len(extra_hyphens)
+            extra_indent = "    " * max(level - 1, 0)
+            text_content = _cap_first_letter(content.rstrip())
+            final.append(f"{base_indent}{extra_indent}- {text_content}")
+            continue
+
         # 1) Handle explicit nesting markers -, --, --- at line start
         m = nest_rx.match(line)
         if m:
             base_indent, hyphens, content = m.groups()
             level = len(hyphens)  # 1..6
-            extra_indent = "  " * max(level - 1, 0)
-            final.append(f"{base_indent}{extra_indent}- {content.rstrip()}")
+            extra_indent = "    " * max(level - 1, 0)
+            text_content = _cap_first_letter(content.rstrip())
+            final.append(f"{base_indent}{extra_indent}- {text_content}")
             continue
 
         # 2) Handle "normal" bullet characters (•, *, etc.)
@@ -197,10 +232,12 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
             if nested:
                 hyphens, nested_content = nested.groups()
                 level = len(hyphens)  # 1..6
-                extra_indent = "  " * max(level - 1, 0)
-                final.append(f"{indent}{extra_indent}- {nested_content.rstrip()}")
+                extra_indent = "    " * max(level - 1, 0)
+                text_content = _cap_first_letter(nested_content.rstrip())
+                final.append(f"{indent}{extra_indent}- {text_content}")
             else:
-                final.append(f"{indent}- {content}")
+                text_content = _cap_first_letter(content)
+                final.append(f"{indent}- {text_content}")
             continue
 
         # 3) Numbered list
@@ -208,7 +245,8 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
         if m:
             indent, n = m.groups()
             content = num_rx.sub("", line).rstrip()
-            final.append(f"{indent}{n}. {content}")
+            text_content = _cap_first_letter(content)
+            final.append(f"{indent}{n}. {text_content}")
             continue
 
         final.append(line.rstrip())
@@ -403,6 +441,8 @@ def export_images(note_path: Path, bridge: BridgeConfig) -> list[Path]:
             [
                 "supernote-tool",
                 "convert",
+                "-t",
+                "png",
                 "-a",
                 str(note_path),
                 str(output_prefix),
