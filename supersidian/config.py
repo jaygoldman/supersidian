@@ -19,6 +19,8 @@ class BridgeConfig:
     extra_tags: List[str]
     aggressive_cleanup: bool = False
     spellcheck: bool = False
+    export_images: bool = False
+    images_subdir: str = "Supersidian/Assets"
 
 
 @dataclass
@@ -91,6 +93,8 @@ def load_config(project_root: Optional[Path] = None) -> SupersidianConfig:
         extra_tags = entry.get("extra_tags", []) or []
         aggressive_cleanup = bool(entry.get("aggressive_cleanup", False))
         spellcheck = bool(entry.get("spellcheck", False))
+        export_images = bool(entry.get("export_images", False))
+        images_subdir = entry.get("images_subdir", "Supersidian/Assets")
 
         bridges.append(
             BridgeConfig(
@@ -102,6 +106,8 @@ def load_config(project_root: Optional[Path] = None) -> SupersidianConfig:
                 extra_tags=list(extra_tags),
                 aggressive_cleanup=aggressive_cleanup,
                 spellcheck=spellcheck,
+                export_images=export_images,
+                images_subdir=images_subdir,
             )
         )
 

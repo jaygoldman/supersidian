@@ -191,7 +191,16 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
         if m:
             indent = m.group(1) or ""
             content = bullet_rx.sub("", line).rstrip()
-            final.append(f"{indent}- {content}")
+
+            # Allow explicit nesting markers after a Supernote bullet, e.g. "• -- text"
+            nested = re.match(r"^(-{1,6})\s+(.*)$", content)
+            if nested:
+                hyphens, nested_content = nested.groups()
+                level = len(hyphens)  # 1..6
+                extra_indent = "  " * max(level - 1, 0)
+                final.append(f"{indent}{extra_indent}- {nested_content.rstrip()}")
+            else:
+                final.append(f"{indent}- {content}")
             continue
 
         # 3) Numbered list
@@ -385,16 +394,18 @@ def export_images(note_path: Path, bridge: BridgeConfig) -> list[Path]:
     note_dir = assets_root / note_path.stem
     note_dir.mkdir(parents=True, exist_ok=True)
 
+    # supernote-tool expects a file path for the output, even when exporting all pages.
+    # It will create files like "prefix-1.png", "prefix-2.png", etc.
+    output_prefix = note_dir / f"{note_path.stem}.png"
+
     try:
         result = subprocess.run(
             [
                 "supernote-tool",
                 "convert",
-                "-t",
-                "png",
                 "-a",
                 str(note_path),
-                str(note_dir),
+                str(output_prefix),
             ],
             capture_output=True,
             text=True,
