@@ -21,9 +21,43 @@ import json
 import urllib.request
 import urllib.error
 
+# Load environment variables from project .env before reading them, using a simple KEY=VALUE parser
+ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+
+def _load_env_from_file(path: Path) -> None:
+    """Minimal .env loader: parses KEY=VALUE lines, ignores others, and does not overwrite existing env vars."""
+    if not path.exists():
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = val.strip()
+        if not key:
+            continue
+        if key not in os.environ:
+            os.environ[key] = val
+
+_load_env_from_file(ENV_PATH)
+
 # Determine verbose mode from environment variable SUPERSIDIAN_VERBOSE
 VERBOSE = os.environ.get("SUPERSIDIAN_VERBOSE", "0") == "1"
 WEBHOOK_URL = os.environ.get("SUPERSIDIAN_WEBHOOK_URL")
+WEBHOOK_TOPIC = os.environ.get("SUPERSIDIAN_WEBHOOK_TOPIC")
+
+# Notification mode: all, errors, none
+_raw_notify_mode = os.environ.get("SUPERSIDIAN_WEBHOOK_NOTIFICATIONS", "errors")
+NOTIFY_MODE = _raw_notify_mode.strip().strip("'\"").lower()
+if NOTIFY_MODE not in {"all", "errors", "none"}:
+    NOTIFY_MODE = "errors"
 
 LOG_PATH = Path.home() / ".supersidian.log"
 
@@ -37,6 +71,12 @@ logging.basicConfig(
 )
 
 log = logging.getLogger("supersidian")
+
+if VERBOSE:
+    log.debug(
+        f"Startup configuration: VERBOSE={VERBOSE}, NOTIFY_MODE='{NOTIFY_MODE}', "
+        f"WEBHOOK_URL={WEBHOOK_URL!r}, WEBHOOK_TOPIC={WEBHOOK_TOPIC!r}"
+    )
 
 
 BULLET_CHARS = "•–—*-+·►"
@@ -385,6 +425,15 @@ def send_notification(
         return
 
     now = datetime.datetime.now().isoformat(timespec="seconds")
+    error_flag = bool(tool_missing or tool_failed or no_text or supernote_missing or vault_missing)
+    status_label = "error" if error_flag else "ok"
+    summary = (
+        f"Supersidian [{bridge.name}] run ({status_label}) - "
+        f"notes_found={notes_found}, converted={converted}, skipped={skipped}, "
+        f"no_text={no_text}, tool_missing={tool_missing}, tool_failed={tool_failed}, "
+        f"supernote_missing={supernote_missing}, vault_missing={vault_missing}"
+    )
+
     payload = {
         "bridge": bridge.name,
         "timestamp": now,
@@ -396,7 +445,11 @@ def send_notification(
         "tool_failed": tool_failed,
         "supernote_missing": supernote_missing,
         "vault_missing": vault_missing,
+        "title": f"Supersidian: {bridge.name}",
+        "message": summary,
     }
+    if WEBHOOK_TOPIC:
+        payload["topic"] = WEBHOOK_TOPIC
 
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -404,6 +457,12 @@ def send_notification(
         data=data,
         headers={"Content-Type": "application/json"},
     )
+
+    if VERBOSE:
+        log.debug(
+            f"[{bridge.name}] sending notification to {WEBHOOK_URL} "
+            f"with payload: {json.dumps(payload, ensure_ascii=False)}"
+        )
 
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -571,33 +630,41 @@ def process_bridge(bridge: BridgeConfig) -> None:
                 supernote_missing=True,
             )
         # Notify if configured
-        send_notification(
-            bridge,
-            notes_found=0,
-            converted=0,
-            skipped=0,
-            no_text=0,
-            tool_missing=0,
-            tool_failed=0,
-            supernote_missing=True,
-            vault_missing=not bridge.vault_path.exists(),
-        )
+        if NOTIFY_MODE != "none":
+            send_notification(
+                bridge,
+                notes_found=0,
+                converted=0,
+                skipped=0,
+                no_text=0,
+                tool_missing=0,
+                tool_failed=0,
+                supernote_missing=True,
+                vault_missing=not bridge.vault_path.exists(),
+            )
+        else:
+            if VERBOSE:
+                log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (supernote missing)")
         return
 
     if not bridge.vault_path.exists():
         log.warning(f"[{bridge.name}] vault_path does not exist: {bridge.vault_path}")
         # Cannot write a status note without a vault, but can still notify
-        send_notification(
-            bridge,
-            notes_found=0,
-            converted=0,
-            skipped=0,
-            no_text=0,
-            tool_missing=0,
-            tool_failed=0,
-            supernote_missing=False,
-            vault_missing=True,
-        )
+        if NOTIFY_MODE != "none":
+            send_notification(
+                bridge,
+                notes_found=0,
+                converted=0,
+                skipped=0,
+                no_text=0,
+                tool_missing=0,
+                tool_failed=0,
+                supernote_missing=False,
+                vault_missing=True,
+            )
+        else:
+            if VERBOSE:
+                log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (vault missing)")
         return
 
     notes = list(bridge.supernote_path.rglob("*.note"))
@@ -642,7 +709,8 @@ def process_bridge(bridge: BridgeConfig) -> None:
         supernote_missing=False,
     )
 
-    if tool_missing or tool_failed or no_text:
+    errorish = bool(tool_missing or tool_failed or no_text)
+    if NOTIFY_MODE == "all" or (NOTIFY_MODE == "errors" and errorish):
         send_notification(
             bridge,
             notes_found=len(notes),
@@ -654,6 +722,12 @@ def process_bridge(bridge: BridgeConfig) -> None:
             supernote_missing=False,
             vault_missing=False,
         )
+    else:
+        if VERBOSE:
+            log.debug(
+                f"[{bridge.name}] notification suppressed by NOTIFY_MODE='{NOTIFY_MODE}' "
+                f"(errorish={errorish})"
+            )
 
 
 def main() -> None:
