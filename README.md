@@ -87,6 +87,102 @@ becomes:
 This works alongside nested bullets and aggressive cleanup.
 ```
 
+### 📝 Task Extraction & Todoist Sync
+Supersidian automatically detects Supernote checkbox lines (`[ ]` and `[x]`) and converts them into Obsidian tasks. In addition, tasks now participate in a full task‑sync pipeline:
+
+#### ✔ Local Task Registry (SQLite)
+Every detected task is assigned a stable local ID and stored in a lightweight local SQLite database. This enables:
+- idempotent processing across runs
+- preventing duplicate syncs
+- future integration with multiple providers
+
+#### ✔ Only Open Tasks Sync to Todoist
+Supersidian syncs **only unchecked tasks** (`[ ]`) to Todoist.
+Completed tasks (`[x]`) are **ignored** for sync purposes and stored locally only. This keeps your Todoist inbox clean and prevents noise.
+
+#### ✔ Todoist Integration
+If you set:
+```
+SUPERSIDIAN_TODO_PROVIDER=todoist
+SUPERSIDIAN_TODOIST_API_TOKEN=your_api_token
+```
+new open tasks are automatically sent to your Todoist inbox.
+Each created Todoist task includes:
+- the task content
+- labels: `supersidian` and `vault:<VaultName>`
+- a description containing vault, note path, line number, and local task ID
+
+If no provider is configured, or Todoist is unavailable, Supersidian falls back to a safe no‑op provider and marks tasks as "skipped" without raising errors.
+
+#### ✔ Idempotent Sync
+Each task is synced only once. Supersidian never resends a task that has already been assigned a Todoist ID.
+
+### 🔌 Plugin Architecture for Task Providers
+Supersidian includes a small plugin system for task services. By default it ships with a fully functional **Todoist provider**, but the same mechanism can be used to integrate with services like **Asana**, **Monday.com**, **ClickUp**, **Things**, **Notion**, and others.
+
+#### ✔ How Providers Fit In
+Providers live under:
+
+```
+supersidian/todo/
+```
+
+Supersidian core:
+- extracts tasks from Markdown into `LocalTask` objects
+- determines which ones are new (using the SQLite registry)
+- hands the new tasks to the active provider
+
+The provider:
+- receives a list of `LocalTask` objects plus a `TodoContext` (bridge + vault info)
+- creates corresponding tasks in the external system
+- returns `TaskSyncResult` objects describing what happened per task
+
+Supersidian then persists those results back into the SQLite registry.
+
+#### ✔ Selecting a Provider
+You choose a provider via an environment variable in `.env`:
+
+```
+SUPERSIDIAN_TODO_PROVIDER=todoist
+```
+
+If this is unset or invalid, Supersidian automatically uses a safe **no-op provider** that marks tasks as skipped instead of raising errors.
+
+#### ✔ Writing Your Own Provider
+To add support for a new external task platform:
+
+1. Create a new file under `supersidian/todo/`, for example:
+   ```
+   supersidian/todo/asana.py
+   ```
+2. Implement a class that subclasses `BaseTodoProvider` from `supersidian/todo/base.py`:
+   ```python
+   from .base import BaseTodoProvider, TodoContext
+   from ..storage import LocalTask, TaskSyncResult
+
+   class AsanaProvider(BaseTodoProvider):
+       name = "asana"
+
+       def sync_tasks(self, tasks, ctx):
+           results = []
+           for t in tasks:
+               # Call Asana's API here to create a task
+               external_id = "..."  # Replace with actual ID from Asana
+               results.append(TaskSyncResult(
+                   local_id=t.local_id,
+                   provider=self.name,
+                   external_id=external_id,
+                   status="created",
+                   error=None,
+               ))
+           return results
+   ```
+3. Register the provider name in `supersidian/todo/__init__.py` so it can be resolved from `SUPERSIDIAN_TODO_PROVIDER`.
+4. Open a pull request adding your provider.
+
+Because Supersidian handles idempotency and local history, providers can remain small and focused: receive tasks, create them in the external system, return results.
+
+---
 ### 6. Custom word corrections
 Inside your vault, create: 
 
@@ -255,6 +351,7 @@ source .venv/bin/activate
 python -m supersidian.bridge
 ```
 
+
 It will:
 - scan all enabled bridges
 - detect updated Supernote notes
@@ -262,6 +359,114 @@ It will:
 - apply replacements
 - write Markdown
 - skip unchanged notes
+
+### ⏱ Scheduling Supersidian
+Supersidian is designed to be run repeatedly in the background so your Obsidian vault stays in sync with your Supernote. The core script is a one-shot process; you attach your own scheduler.
+
+#### macOS: launchd (recommended)
+On macOS, the native way to run Supersidian on a schedule is with a **LaunchAgent**:
+
+1. Create a file at:
+   `~/Library/LaunchAgents/com.supersidian.bridge.plist`
+2. Example contents (runs every 10 minutes):
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+     <key>Label</key>
+     <string>com.supersidian.bridge</string>
+
+     <key>WorkingDirectory</key>
+     <string>/Users/you/Dev/supersidian</string>
+
+     <key>ProgramArguments</key>
+     <array>
+       <string>/Users/you/Dev/supersidian/.venv/bin/python</string>
+       <string>-m</string>
+       <string>supersidian.bridge</string>
+     </array>
+
+     <key>StartInterval</key>
+     <integer>600</integer>
+
+     <key>StandardOutPath</key>
+     <string>/Users/you/Library/Logs/supersidian.log</string>
+     <key>StandardErrorPath</key>
+     <string>/Users/you/Library/Logs/supersidian.err.log</string>
+   </dict>
+   </plist>
+   ```
+3. Load it:
+   ```bash
+   launchctl load ~/Library/LaunchAgents/com.supersidian.bridge.plist
+   ```
+
+#### macOS / Linux: cron
+If you prefer `cron`, you can add a line like this:
+
+```bash
+*/10 * * * * cd /Users/you/Dev/supersidian && \
+  source .venv/bin/activate && \
+  python -m supersidian.bridge >> ~/.supersidian.cron.log 2>&1
+```
+
+This runs Supersidian every 10 minutes, writing additional logs to `~/.supersidian.cron.log`.
+
+### ❤️ Monitoring with healthchecks.io (optional)
+Supersidian doesn’t talk to healthchecks.io directly, but you can easily pair them using your scheduler. The idea:
+
+- healthchecks.io watches **whether Supersidian runs and exits cleanly**
+- Supersidian itself continues to handle note conversion, logging, and notifications
+
+#### Example: cron + healthchecks.io
+Assume you created a check in healthchecks.io and got this URL:
+
+```text
+https://hc-ping.com/your-check-uuid
+```
+
+Update your cron entry to wrap Supersidian with pings:
+
+```bash
+*/10 * * * * HC_URL=https://hc-ping.com/your-check-uuid && \
+  curl -fsS "$HC_URL/start" -m 10 || true; \
+  cd /Users/you/Dev/supersidian && \
+  source .venv/bin/activate && \
+  python -m supersidian.bridge && \
+  curl -fsS "$HC_URL" -m 10 || \
+  curl -fsS "$HC_URL/fail" -m 10 || true
+```
+
+This pattern:
+- sends a `/start` ping before Supersidian runs
+- sends a success ping on exit code 0
+- sends a `/fail` ping if the process exits non‑zero
+
+#### Example: launchd + wrapper script
+For `launchd`, you can point `ProgramArguments` to a small shell script, for example:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+HC_URL="https://hc-ping.com/your-check-uuid"
+
+curl -fsS "$HC_URL/start" -m 10 || true
+
+cd /Users/you/Dev/supersidian
+source .venv/bin/activate
+
+if python -m supersidian.bridge; then
+  curl -fsS "$HC_URL" -m 10 || true
+else
+  curl -fsS "$HC_URL/fail" -m 10 || true
+fi
+```
+
+Then point your LaunchAgent’s `ProgramArguments` at this script instead of calling Python directly.
+
+Using healthchecks.io this way turns Supersidian into a monitored background service: you’ll be alerted if the job stops running, crashes, or begins failing consistently.
 
 ---
 ## 📁 Folder Strategy
