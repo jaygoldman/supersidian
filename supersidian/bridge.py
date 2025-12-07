@@ -516,13 +516,41 @@ def send_notification(
 
     now = datetime.datetime.now().isoformat(timespec="seconds")
     error_flag = bool(tool_missing or tool_failed or no_text or supernote_missing or vault_missing)
-    status_label = "error" if error_flag else "ok"
-    summary = (
-        f"Supersidian [{bridge.name}] run ({status_label}) - "
-        f"notes_found={notes_found}, converted={converted}, skipped={skipped}, "
-        f"no_text={no_text}, tool_missing={tool_missing}, tool_failed={tool_failed}, "
-        f"supernote_missing={supernote_missing}, vault_missing={vault_missing}"
-    )
+    outcome = "ERROR" if error_flag else "OK"
+
+    # Human-readable vault label comes from the vault folder name
+    vault_name = bridge.vault_path.name
+
+    # Build a multi-line, ntfy-friendly message
+    lines = [
+        f"Supersidian: {vault_name} - [{outcome}]",
+        "",
+        f"Notes: {notes_found}",
+        f"Converted: {converted}",
+        f"Skipped: {skipped}",
+        f"No text: {no_text}",
+    ]
+
+    errors: list[str] = []
+    if tool_missing:
+        errors.append("supernote-tool not found")
+    if tool_failed:
+        errors.append("supernote-tool failed")
+    if supernote_missing:
+        errors.append("Supernote path is missing")
+    if vault_missing:
+        errors.append("Obsidian vault is missing")
+
+    if errors:
+        lines.append("")
+        if len(errors) == 1:
+            lines.append(f"Error: {errors[0]}")
+        else:
+            lines.append("Errors:")
+            for e in errors:
+                lines.append(f"- {e}")
+
+    message = "\n".join(lines)
 
     payload = {
         "bridge": bridge.name,
@@ -536,7 +564,7 @@ def send_notification(
         "supernote_missing": supernote_missing,
         "vault_missing": vault_missing,
         "title": f"Supersidian: {bridge.name}",
-        "message": summary,
+        "message": message,
     }
     if WEBHOOK_TOPIC:
         payload["topic"] = WEBHOOK_TOPIC
