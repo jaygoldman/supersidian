@@ -172,6 +172,7 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
     )
     numbered_start = re.compile(r"^\s*\d+[\.)]\s+")
     heading_start = re.compile(r"^\s*#{1,6}\s+")
+    taskish_start = re.compile(r"^\s*(?:\(\]|I\]|☐|☑|☒|\[×\])")
 
     def _cap_first_letter(s: str) -> str:
         """Capitalize the first alphabetic character in the string, leaving the rest unchanged."""
@@ -196,6 +197,7 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
             bullet_start.match(line)
             or numbered_start.match(line)
             or heading_start.match(line)
+            or taskish_start.match(line)
             or curr_blank
         )
 
@@ -212,6 +214,8 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
 
     nest_rx = re.compile(r"^(\s*)(-{1,6})\s+(.*)$")
 
+    task_rx = re.compile(r"^(\s*)\[( |x|X)\]\s+(.*)$")
+
     bullet_rx = re.compile(
         rf"^(\s*)(?:[{re.escape(BULLET_CHARS)}]|\[[ xX]\])\s+"
     )
@@ -223,6 +227,16 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
         if line.strip() == "" or heading_start.match(line):
             final.append(line.rstrip())
             continue
+
+        # Normalize common Supernote checkbox variants into ASCII forms so task_rx can see them.
+        line = (
+            line.replace("☐", "[ ]")
+                .replace("☑", "[x]")
+                .replace("☒", "[x]")
+                .replace("[×]", "[x]")
+                .replace("(]", "[ ]")
+                .replace("I]", "[ ]")
+        )
 
         # 0) Split lines that contain "- -" (or "- --" etc.) in the middle into
         #    a prefix line + a nested bullet line.
@@ -259,6 +273,15 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
             extra_indent = "    " * max(level - 1, 0)
             text_content = _cap_first_letter(content.rstrip())
             final.append(f"{base_indent}{extra_indent}- {text_content}")
+            continue
+
+        # 1.5) Handle explicit task lines like "[ ] text" or "[x] text"
+        m = task_rx.match(line)
+        if m:
+            indent, mark, content = m.groups()
+            mark_char = "x" if mark.lower() == "x" else " "
+            text_content = _cap_first_letter(content.rstrip())
+            final.append(f"{indent}- [{mark_char}] {text_content}")
             continue
 
         # 2) Handle "normal" bullet characters (•, *, etc.)
