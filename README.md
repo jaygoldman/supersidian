@@ -18,6 +18,7 @@ Supernote’s handwriting recognition is excellent, but the workflow around it h
 - Recognized text often merges headings or loses indentation.
 - Bullet structure is not reliably preserved.
 - You can't automatically sync into a note-taking system like Obsidian.
+- Supports Obsidian‑style checkboxes (`[ ]` and `[x]`) written directly on Supernote
 
 Supersidian automates the entire pipeline:
 
@@ -69,6 +70,22 @@ Supersidian:
 - splits inline headings (e.g., `some text ##Heading` → two lines)
 - normalizes heading spacing (e.g. `##Title` → `## Title`)
 - converts `-, --, ---` into nested Markdown indentation
+- converts `[ ] task` and `[x] task` lines into proper Obsidian tasks (`- [ ] Task`, `- [x] Task`)
+
+### Task Conversion
+Supersidian now detects Supernote lines starting with `[ ]` or `[x]` and transforms them into Obsidian tasks:
+```
+[ ] follow up with client
+[x] send agenda
+```
+becomes:
+```md
+- [ ] Follow up with client
+- [x] Send agenda
+```
+```
+This works alongside nested bullets and aggressive cleanup.
+```
 
 ### 6. Custom word corrections
 Inside your vault, create: 

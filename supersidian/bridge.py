@@ -17,6 +17,9 @@ from .config import load_config, BridgeConfig
 import logging
 import os
 
+from .storage import LocalTask, TaskSyncResult, get_known_task_ids, record_task_sync_results
+from .todo import TodoContext, provider_from_env
+
 import json
 import urllib.request
 import urllib.error
@@ -172,7 +175,7 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
     )
     numbered_start = re.compile(r"^\s*\d+[\.)]\s+")
     heading_start = re.compile(r"^\s*#{1,6}\s+")
-    taskish_start = re.compile(r"^\s*(?:\(\]|I\]|☐|☑|☒|\[×\])")
+    taskish_start = re.compile(r"^\s*(?:\(\]|I\]|1\]|l\]|\|\]|☐|☑|☒|\[×\])")
 
     def _cap_first_letter(s: str) -> str:
         """Capitalize the first alphabetic character in the string, leaving the rest unchanged."""
@@ -228,14 +231,27 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
             final.append(line.rstrip())
             continue
 
-        # Normalize common Supernote checkbox variants into ASCII forms so task_rx can see them.
+        # Normalize common Supernote checkbox variants and bracket mis-OCRs into ASCII forms so task_rx can see them.
         line = (
             line.replace("☐", "[ ]")
                 .replace("☑", "[x]")
                 .replace("☒", "[x]")
                 .replace("[×]", "[x]")
+                # Full-width / decorative bracket characters
+                .replace("［", "[")
+                .replace("【", "[")
+                .replace("〖", "[")
+                .replace("『", "[")
+                .replace("］", "]")
+                .replace("】", "]")
+                .replace("〗", "]")
+                .replace("』", "]")
+                # Common mis-OCR of leading bracket into similar glyphs before ']'
                 .replace("(]", "[ ]")
                 .replace("I]", "[ ]")
+                .replace("1]", "[ ]")
+                .replace("l]", "[ ]")
+                .replace("|]", "[ ]")
         )
 
         # 0) Split lines that contain "- -" (or "- --" etc.) in the middle into
@@ -362,6 +378,57 @@ def apply_aggressive_cleanups(lines: list[str]) -> list[str]:
         cleaned.append(raw)
 
     return cleaned
+
+
+# Regex and helper to extract tasks from rendered Markdown
+TASK_LINE_RX = re.compile(r"^(\s*)-\s\[( |x|X)\]\s+(.*)$")
+
+def extract_tasks_from_markdown(
+    md_body: str,
+    bridge: BridgeConfig,
+    rel_md_path: Path,
+) -> list[LocalTask]:
+    """Scan the Markdown body for Obsidian-style tasks and return LocalTask objects.
+
+    This does not perform any provider sync; it only identifies tasks and
+    assigns a stable local_id based on bridge, note path, and line number.
+    """
+
+    tasks: list[LocalTask] = []
+    vault_name = bridge.vault_path.name
+    note_rel = rel_md_path.as_posix()
+
+    for idx, line in enumerate(md_body.splitlines(), start=1):
+        m = TASK_LINE_RX.match(line)
+        if not m:
+            continue
+
+        _, mark, title = m.groups()
+        title = title.strip()
+        if not title:
+            continue
+
+        completed = mark.lower() == "x"
+        local_id = f"{bridge.name}:{note_rel}:{idx}"
+
+        tasks.append(
+            LocalTask(
+                local_id=local_id,
+                bridge_name=bridge.name,
+                vault_name=vault_name,
+                note_path=note_rel,
+                line_no=idx,
+                title=title,
+                completed=completed,
+            )
+        )
+
+    if VERBOSE and tasks:
+        log.debug(
+            f"[{bridge.name}] detected {len(tasks)} task(s) in {note_rel}"
+        )
+
+    return tasks
 
 
 def apply_replacements(text: str, repl: dict[str, str]) -> str:
@@ -595,6 +662,37 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
     repl = load_replacements(bridge.vault_path, bridge.name)
     if repl:
         md_body = apply_replacements(md_body, repl)
+
+    # Detect tasks in the rendered Markdown body.
+    rel_md = rel.with_suffix(".md")
+    tasks = extract_tasks_from_markdown(md_body, bridge, rel_md)
+
+    # Persist newly seen tasks into the local SQLite registry using the
+    # configured todo provider (Todoist, noop, etc.). Supersidian ensures
+    # that we only send previously unseen tasks to providers; providers are
+    # responsible for attempting the external sync and returning
+    # TaskSyncResult objects. Completed tasks ([x]) are *not* synced to
+    # external todo systems.
+    if tasks:
+        task_ids = [t.local_id for t in tasks]
+        known_ids = get_known_task_ids(task_ids)
+        new_tasks = [t for t in tasks if t.local_id not in known_ids]
+        new_open_tasks = [t for t in new_tasks if not t.completed]
+
+        if VERBOSE:
+            log.debug(
+                f"[{bridge.name}] tasks total={len(tasks)}, known={len(known_ids)}, new={len(new_tasks)}, new_open={len(new_open_tasks)}"
+            )
+
+        if new_open_tasks:
+            ctx = TodoContext(
+                bridge_name=bridge.name,
+                vault_name=bridge.vault_path.name,
+                vault_path=bridge.vault_path,
+            )
+            provider = provider_from_env()
+            results = provider.sync_tasks(new_open_tasks, ctx)
+            record_task_sync_results(new_open_tasks, results)
 
     first = next((l for l in md_body.splitlines() if l.strip()), "")
     title_candidate = re.sub(r"^[-\*\d\.\)]+\s+", "", first).strip("# ").strip()
