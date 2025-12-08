@@ -23,6 +23,7 @@ Supersidian watches your Supernote-synced Dropbox folder, extracts recognized te
 - [License](#license)
 
 ---
+<a id="what-problem-does-supersidian-solve"></a>
 ## ✨ What problem does Supersidian solve?
 
 Supernote’s handwriting recognition is excellent, but the workflow around it has limitations:
@@ -46,6 +47,7 @@ Supersidian automates the entire pipeline:
 It’s a “write once, sync forever” system.
 
 ---
+<a id="how-supersidian-works"></a>
 ## 🧩 How Supersidian works
 
 ### 1. You write in Supernote
@@ -223,6 +225,7 @@ Supernote/Note/Klick/Guardrail/Foo.note
 ```
 
 ---
+<a id="requirements"></a>
 ## 🛠 Requirements
 
 > Supersidian is cross‑platform. It runs on macOS, Linux, or Windows — anywhere Python and a local Dropbox‑synced folder are available.
@@ -276,6 +279,7 @@ pip install -r requirements.txt
 ```
 
 ---
+<a id="logging"></a>
 ## 📝 Logging
 
 Supersidian includes built‑in logging so you can monitor activity and diagnose issues.
@@ -322,6 +326,7 @@ The log includes:
 Logs persist between runs, allowing long‑term auditing of your sync pipeline.
 
 ---
+<a id="configuration"></a>
 ## ⚙️ Configuration
 
 Supersidian uses two files:
@@ -362,6 +367,7 @@ Defines one or more “bridges” mapping Supernote folders to Obsidian vaults:
 Supersidian supports multiple vaults (“bridges”) in parallel.
 
 ---
+<a id="running-supersidian"></a>
 ## ▶️ Running Supersidian
 
 From the project root:
@@ -489,6 +495,7 @@ Then point your LaunchAgent’s `ProgramArguments` at this script instead of cal
 Using healthchecks.io this way turns Supersidian into a monitored background service: you’ll be alerted if the job stops running, crashes, or begins failing consistently.
 
 ---
+<a id="folder-strategy"></a>
 ## 📁 Folder Strategy
 
 Supersidian mirrors whatever folder structure you maintain on your Supernote device.  
@@ -514,6 +521,7 @@ Klick/
 If you later *move* a note inside Obsidian, and then update the corresponding `.note` file on Supernote, the next Supersidian run will recreate it at the original mirrored path.
 
 ---
+<a id="editing-corrections-inside-obsidian"></a>
 ## 🔄 Editing Corrections Inside Obsidian
 
 Users maintain their own correction list directly inside their vault:
@@ -538,6 +546,7 @@ Example:
 Every run loads this note and applies the corrections.
 
 ---
+<a id="supersidian-status-notes"></a>
 ## 📊 Supersidian Status Notes
 
 On every run, Supersidian generates a status report *inside your Obsidian vault* for each enabled bridge. The note is named:
@@ -589,6 +598,7 @@ This gives you real‑time visibility:
 It allows monitoring directly inside Obsidian without reading log files.
 
 ---
+<a id="notifications--webhook-integration"></a>
 ## 🔔 Notifications & Webhook Integration
 
 Supersidian can optionally send notifications when something goes wrong during a run.  
@@ -693,6 +703,7 @@ Your script can then respond however you prefer.
 Notifications allow you to monitor sync reliability even when Supersidian runs unattended (e.g., as a scheduled job).
 
 ---
+<a id="license"></a>
 ## 📜 License
 
 MIT — use freely, improve freely, share freely.
