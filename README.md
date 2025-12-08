@@ -8,6 +8,20 @@ The goal is simple:
 
 Supersidian watches your Supernote-synced Dropbox folder, extracts recognized text using `supernote-tool`, cleans it up, fixes headings and indentation, applies custom corrections you maintain inside Obsidian, and writes Markdown files into your Obsidian vault.
 
+## Table of Contents
+
+- [What problem does Supersidian solve?](#what-problem-does-supersidian-solve)
+- [How Supersidian works](#how-supersidian-works)
+- [Requirements](#requirements)
+- [Logging](#logging)
+- [Configuration](#configuration)
+- [Running Supersidian](#running-supersidian)
+- [Folder Strategy](#folder-strategy)
+- [Editing Corrections Inside Obsidian](#editing-corrections-inside-obsidian)
+- [Supersidian Status Notes](#supersidian-status-notes)
+- [Notifications & Webhook Integration](#notifications--webhook-integration)
+- [License](#license)
+
 ---
 ## ✨ What problem does Supersidian solve?
 
