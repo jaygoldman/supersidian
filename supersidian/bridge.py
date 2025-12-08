@@ -572,7 +572,9 @@ def send_notification(
         return
 
     now = datetime.datetime.now().isoformat(timespec="seconds")
-    error_flag = bool(tool_missing or tool_failed or no_text or supernote_missing or vault_missing)
+    # Treat only structural issues as errors for the notification outcome; notes
+    # with no recognized text do not by themselves mark the run as [ERROR].
+    error_flag = bool(tool_missing or tool_failed or supernote_missing or vault_missing)
     outcome = "ERROR" if error_flag else "OK"
 
     # Human-readable vault label comes from the vault folder name
