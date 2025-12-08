@@ -912,7 +912,11 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         supernote_missing=False,
     )
 
-    errorish = bool(tool_missing or tool_failed or no_text)
+    # For error signaling (notifications + healthchecks), only treat structural
+    # issues as errors: missing tool, tool failures, or missing paths.
+    # Notes with no recognized text are reported in the status/notification
+    # summary but do not, by themselves, mark the run as failed.
+    errorish = bool(tool_missing or tool_failed)
     if NOTIFY_MODE == "all" or (NOTIFY_MODE == "errors" and errorish):
         send_notification(
             bridge,
