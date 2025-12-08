@@ -318,6 +318,12 @@ Environment variables (ignored by Git):
 ```
 SUPERSIDIAN_SUPERNOTE_ROOT=/Users/you/Library/CloudStorage/Dropbox/Supernote/Note
 SUPERSIDIAN_CONFIG_PATH=./supersidian.config.json
+
+# Optional: webhook configuration
+SUPERSIDIAN_WEBHOOK_URL=
+SUPERSIDIAN_WEBHOOK_TOPIC=
+# One of: errors, all, none (default: errors)
+SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors
 ```
 
 ### `supersidian.config.json`
@@ -576,11 +582,20 @@ If a webhook URL is provided, Supersidian will POST a JSON payload describing th
 
 ### Enabling Notifications
 
-Set an environment variable in your `.env` file:
+Set environment variables in your `.env` file:
 
 ```
 SUPERSIDIAN_WEBHOOK_URL=https://your-webhook-endpoint
+SUPERSIDIAN_WEBHOOK_TOPIC=optional-topic-name
+SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors
 ```
+
+- `SUPERSIDIAN_WEBHOOK_URL` (required to enable notifications) is any HTTP endpoint that accepts JSON.
+- `SUPERSIDIAN_WEBHOOK_TOPIC` (optional) is a logical topic or channel name used by services like ntfy.sh.
+- `SUPERSIDIAN_WEBHOOK_NOTIFICATIONS` controls when Supersidian sends notifications and can be:
+  - `errors` (default): send notifications only for runs with structural errors (missing tool, tool failures, missing Supernote or vault paths).
+  - `all`: send a summary notification for **every** run, even when everything succeeds.
+  - `none`: never send notifications, even if `SUPERSIDIAN_WEBHOOK_URL` is set.
 
 This can be any HTTP endpoint that accepts JSON:
 - ntfy.sh
@@ -592,7 +607,7 @@ If `SUPERSIDIAN_WEBHOOK_URL` is **not** set, notifications are disabled.
 
 ### What triggers a notification?
 
-A webhook is sent only if **any errors occur**:
+By default (`SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors`), a webhook is sent only if **structural errors occur**:
 
 - Supernote folder is missing
 - Vault folder is missing
@@ -628,7 +643,9 @@ This provides enough detail for dashboards, alerts, or automation responses.
 Add this to `.env`:
 
 ```
-SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/supersidian-alerts
+SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/
+SUPERSIDIAN_WEBHOOK_TOPIC=supersidian-alerts
+SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors
 ```
 
 Then subscribe from any device:
