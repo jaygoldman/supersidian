@@ -6,6 +6,8 @@ import re
 from typing import Optional, Iterable
 from functools import lru_cache
 
+import time
+
 from unidecode import unidecode
 
 import subprocess
@@ -61,6 +63,28 @@ _raw_notify_mode = os.environ.get("SUPERSIDIAN_WEBHOOK_NOTIFICATIONS", "errors")
 NOTIFY_MODE = _raw_notify_mode.strip().strip("'\"").lower()
 if NOTIFY_MODE not in {"all", "errors", "none"}:
     NOTIFY_MODE = "errors"
+
+
+HEALTHCHECK_URL = os.environ.get("SUPERSIDIAN_HEALTHCHECK_URL")
+SUPERNOTE_TOOL = os.environ.get("SUPERSIDIAN_SUPERNOTE_TOOL") or "supernote-tool"
+
+
+def ping_healthcheck(suffix: str = "") -> None:
+    """Ping healthchecks.io (or compatible endpoint) if configured.
+
+    Uses SUPERSIDIAN_HEALTHCHECK_URL as the base; appends an optional suffix
+    such as "/start" or "/fail". Any network errors are swallowed so that
+    healthcheck outages do not break the main run.
+    """
+    if not HEALTHCHECK_URL:
+        return
+    url = HEALTHCHECK_URL.rstrip("/") + suffix
+    try:
+        with urllib.request.urlopen(url, timeout=5):
+            pass
+    except Exception as e:
+        if VERBOSE:
+            log.debug(f"healthcheck ping to {url} failed: {e}")
 
 LOG_PATH = Path.home() / ".supersidian.log"
 
@@ -128,24 +152,57 @@ class ExtractionError(Exception):
         super().__init__(message)
 
 
+# Helper to run supernote-tool with retries for transient Dropbox/CloudStorage errors
+def run_supernote_tool(args: list[str], retries: int = 2, delay: float = 0.5) -> subprocess.CompletedProcess[str]:
+    """Run supernote-tool with a small retry loop for transient errors.
+
+    In particular, we retry on cases where the underlying filesystem reports
+    a temporary deadlock (e.g. Dropbox/CloudStorage race conditions) which
+    surface in supernote-tool's stderr as "Resource deadlock avoided" or
+    "[Errno 11]". Other failures are propagated immediately.
+    """
+    last_err: subprocess.CalledProcessError | None = None
+
+    for attempt in range(retries + 1):
+        try:
+            return subprocess.run(
+                args,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            last_err = e
+            msg = (e.stderr or "").strip() or (e.stdout or "").strip() or str(e)
+            if ("Resource deadlock avoided" in msg or "[Errno 11]" in msg) and attempt < retries:
+                if VERBOSE:
+                    log.warning(
+                        f"supernote-tool transient EDEADLK (attempt {attempt + 1}/{retries}), retrying..."
+                    )
+                time.sleep(delay)
+                continue
+            # Not a transient deadlock, or out of retries: propagate
+            raise
+
+    # Should not be reached, but keeps type checkers happy
+    raise last_err  # type: ignore[misc]
+
+
 def extract_text(note_path: Path) -> Optional[str]:
     # Use a temporary file because supernote-tool's txt output is designed for file targets
     try:
         with tempfile.NamedTemporaryFile(mode="r+", suffix=".txt", delete=False) as tmp:
             tmp_path = tmp.name
-        result = subprocess.run(
+        result = run_supernote_tool(
             [
-                "supernote-tool",
+                SUPERNOTE_TOOL,
                 "convert",
                 "-t",
                 "txt",
                 "-a",
                 str(note_path),
                 tmp_path,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
+            ]
         )
     except FileNotFoundError:
         msg = f"supernote-tool not found on PATH; cannot extract text for {note_path}"
@@ -614,19 +671,16 @@ def export_images(note_path: Path, bridge: BridgeConfig) -> list[Path]:
     output_prefix = note_dir / f"{note_path.stem}.png"
 
     try:
-        result = subprocess.run(
+        result = run_supernote_tool(
             [
-                "supernote-tool",
+                SUPERNOTE_TOOL,
                 "convert",
                 "-t",
                 "png",
                 "-a",
                 str(note_path),
                 str(output_prefix),
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
+            ]
         )
         log.debug(
             f"[{bridge.name}] image export for {note_path} -> {note_dir} "
@@ -759,10 +813,10 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
     return "converted"
 
 
-def process_bridge(bridge: BridgeConfig) -> None:
+def process_bridge(bridge: BridgeConfig) -> bool:
     if not bridge.enabled:
         log.info(f"[{bridge.name}] SKIP disabled")
-        return
+        return False
 
     if not bridge.supernote_path.exists():
         log.warning(f"[{bridge.name}] supernote_path does not exist: {bridge.supernote_path}")
@@ -794,7 +848,7 @@ def process_bridge(bridge: BridgeConfig) -> None:
         else:
             if VERBOSE:
                 log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (supernote missing)")
-        return
+        return True
 
     if not bridge.vault_path.exists():
         log.warning(f"[{bridge.name}] vault_path does not exist: {bridge.vault_path}")
@@ -814,7 +868,7 @@ def process_bridge(bridge: BridgeConfig) -> None:
         else:
             if VERBOSE:
                 log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (vault missing)")
-        return
+        return True
 
     notes = list(bridge.supernote_path.rglob("*.note"))
     if not notes:
@@ -826,7 +880,7 @@ def process_bridge(bridge: BridgeConfig) -> None:
             skipped=0,
             no_text=0,
         )
-        return
+        return False
 
     converted = 0
     skipped = 0
@@ -878,12 +932,31 @@ def process_bridge(bridge: BridgeConfig) -> None:
                 f"(errorish={errorish})"
             )
 
+    return errorish
+
 
 def main() -> None:
     cfg = load_config()
 
-    for bridge in cfg.bridges:
-        process_bridge(bridge)
+    # Ping healthcheck at start of run, if configured
+    ping_healthcheck("/start")
+
+    errorish = False
+    try:
+        for bridge in cfg.bridges:
+            bridge_error = process_bridge(bridge)
+            if bridge_error:
+                errorish = True
+    except Exception:
+        # Any unhandled exception is treated as a failed run for healthchecks
+        errorish = True
+        raise
+    finally:
+        # On success, ping base URL; on error, ping /fail
+        if errorish:
+            ping_healthcheck("/fail")
+        else:
+            ping_healthcheck("")
 
 
 if __name__ == "__main__":
