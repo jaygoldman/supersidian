@@ -86,7 +86,8 @@ def ping_healthcheck(suffix: str = "") -> None:
         if VERBOSE:
             log.debug(f"healthcheck ping to {url} failed: {e}")
 
-LOG_PATH = Path.home() / ".supersidian.log"
+_default_log_path = Path.home() / ".supersidian.log"
+LOG_PATH = Path(os.environ.get("SUPERSIDIAN_LOG_PATH")) if os.environ.get("SUPERSIDIAN_LOG_PATH") else _default_log_path
 
 logging.basicConfig(
     level=logging.DEBUG if VERBOSE else logging.INFO,
@@ -520,6 +521,28 @@ def write_status_note(
     sup_dir = bridge.vault_path / "Supersidian"
     status_path = sup_dir / f"Status - {bridge.name}.md"
     sup_dir.mkdir(parents=True, exist_ok=True)
+
+    # Ensure a per-bridge Replacements note exists with example instructions.
+    repl_path = sup_dir / f"Replacements - {bridge.name}.md"
+    if not repl_path.exists():
+        repl_lines = [
+            f"# Supersidian Replacements - {bridge.name}",
+            "",
+            "# Define whole-word replacements for this vault/bridge.",
+            "# Each non-empty line should look like:",
+            "#   wrong -> right",
+            "# You can optionally prefix with '-', '*', or numbers if you prefer list syntax.",
+            "# Lines starting with '#' are treated as comments and ignored.",
+            "# Example:",
+            "# - Gaurdrail -> Guardrail",
+            "# teh -> the",
+            "",
+        ]
+        try:
+            repl_path.write_text("\n".join(repl_lines) + "\n", encoding="utf-8")
+            log.info(f"[{bridge.name}] created replacements template at {repl_path}")
+        except Exception as e:
+            log.warning(f"[{bridge.name}] failed to create replacements template at {repl_path}: {e}")
     now = datetime.datetime.now().isoformat(timespec="seconds")
 
     lines = [
