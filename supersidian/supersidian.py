@@ -22,6 +22,7 @@ import os
 
 from .storage import LocalTask, TaskSyncResult, get_known_task_ids, record_task_sync_results
 from .todo import TodoContext, provider_from_env
+from .sync import SyncContext, provider_from_env as sync_provider_from_env
 from .__version__ import __version__
 
 import json
@@ -853,7 +854,17 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         log.info(f"[{bridge.name}] SKIP disabled")
         return False
 
-    if not bridge.supernote_path.exists():
+    # Get sync provider for this bridge
+    sync_provider = sync_provider_from_env()
+    sync_ctx = SyncContext(
+        bridge_name=bridge.name,
+        supernote_subdir=bridge.supernote_subdir,
+    )
+
+    # Get the supernote root path from the sync provider
+    supernote_root = sync_provider.get_root_path(sync_ctx)
+
+    if not supernote_root or not supernote_root.exists():
         log.warning(f"[{bridge.name}] supernote_path does not exist: {bridge.supernote_path}")
         # Try to write a status note if the vault exists
         if bridge.vault_path.exists():
@@ -905,9 +916,10 @@ def process_bridge(bridge: BridgeConfig) -> bool:
                 log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (vault missing)")
         return True
 
-    notes = list(bridge.supernote_path.rglob("*.note"))
-    if not notes:
-        log.info(f"[{bridge.name}] no .note files under {bridge.supernote_path}")
+    # Use sync provider to discover notes
+    note_files = sync_provider.list_notes(sync_ctx)
+    if not note_files:
+        log.info(f"[{bridge.name}] no .note files under {supernote_root}")
         write_status_note(
             bridge,
             notes_found=0,
@@ -923,8 +935,8 @@ def process_bridge(bridge: BridgeConfig) -> bool:
     tool_missing = 0
     tool_failed = 0
 
-    for note in notes:
-        status = process_note_for_bridge(note, bridge)
+    for note_file in note_files:
+        status = process_note_for_bridge(note_file.path, bridge)
         if status == "converted":
             converted += 1
         elif status == "skipped_up_to_date":
@@ -938,7 +950,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
 
     write_status_note(
         bridge,
-        notes_found=len(notes),
+        notes_found=len(note_files),
         converted=converted,
         skipped=skipped,
         no_text=no_text,
@@ -955,7 +967,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
     if NOTIFY_MODE == "all" or (NOTIFY_MODE == "errors" and errorish):
         send_notification(
             bridge,
-            notes_found=len(notes),
+            notes_found=len(note_files),
             converted=converted,
             skipped=skipped,
             no_text=no_text,

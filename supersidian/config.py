@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 class BridgeConfig:
     name: str
     enabled: bool
+    supernote_subdir: str  # Subdirectory within supernote root (e.g., "Personal", "Work")
     supernote_path: Path
     vault_path: Path
     default_tags: List[str]
@@ -100,6 +101,7 @@ def load_config(project_root: Optional[Path] = None) -> SupersidianConfig:
             BridgeConfig(
                 name=name,
                 enabled=enabled,
+                supernote_subdir=subdir or "",  # Store the subdirectory for sync providers
                 supernote_path=supernote_path,
                 vault_path=vault_path,
                 default_tags=list(default_tags),
