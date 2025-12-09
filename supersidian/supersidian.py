@@ -7,6 +7,7 @@ from typing import Optional, Iterable
 from functools import lru_cache
 
 import time
+import argparse
 
 from unidecode import unidecode
 
@@ -21,6 +22,7 @@ import os
 
 from .storage import LocalTask, TaskSyncResult, get_known_task_ids, record_task_sync_results
 from .todo import TodoContext, provider_from_env
+from .__version__ import __version__
 
 import json
 import urllib.request
@@ -973,6 +975,28 @@ def process_bridge(bridge: BridgeConfig) -> bool:
 
 
 def main() -> None:
+    global VERBOSE
+
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Supersidian: Automated pipeline for Supernote notes to Obsidian and task apps"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"Supersidian {__version__}",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging output",
+    )
+    args = parser.parse_args()
+
+    # Override VERBOSE if --verbose flag is passed
+    if args.verbose:
+        VERBOSE = True
+
     cfg = load_config()
 
     # Ping healthcheck at start of run, if configured

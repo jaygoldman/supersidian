@@ -1,25 +1,36 @@
 {
+  "_comment": "Copy this file to supersidian.config.json and customize for your setup",
   "bridges": [
     {
-      "name": "vault_name_1_here",
+      "name": "personal",
       "enabled": true,
-      "supernote_subdir": "supernote_subdir_name_here",
-      "vault_path": "/Users/your-username/Obsidian/vault_name_1_here",
-      "extra_tags": ["tag1"]
+      "supernote_subdir": "Personal",
+      "vault_path": "/Users/yourname/Documents/Obsidian/PersonalVault",
+      "export_images": true,
+      "images_subdir": "Supersidian/Assets",
+      "extra_tags": ["supernote", "personal"],
+      "aggressive_cleanup": false,
+      "spellcheck": false
     },
     {
-      "name": "vault_name_2_here",
-      "enabled": false,
-      "supernote_subdir": "supernote_subdir_name_here",
-      "vault_path": "/Users/your-username/Obsidian/vault_name_2_here",
-      "extra_tags": ["tag2"]
+      "name": "work",
+      "enabled": true,
+      "supernote_subdir": "Work",
+      "vault_path": "/Users/yourname/Documents/Obsidian/WorkVault",
+      "export_images": true,
+      "images_subdir": "Assets",
+      "extra_tags": ["supernote", "work"],
+      "aggressive_cleanup": true,
+      "spellcheck": false
     },
     {
-      "name": "vault_name_3_here",
+      "name": "archive",
       "enabled": false,
-      "supernote_subdir": "supernote_subdir_name_here",
-      "vault_path": "/Users/your-username/Obsidian/vault_name_3_here",
-      "extra_tags": ["tag3"]
+      "supernote_subdir": "Archive",
+      "vault_path": "/Users/yourname/Documents/Obsidian/Archive",
+      "extra_tags": ["archived"],
+      "aggressive_cleanup": false,
+      "spellcheck": false
     }
   ]
 }

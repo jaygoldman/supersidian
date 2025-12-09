@@ -26,3 +26,6 @@ dist/
 
 # --- Logs ---
 *.log
+
+# --- LLM Plans ---
+*_PLAN.md

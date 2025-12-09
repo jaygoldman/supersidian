@@ -264,21 +264,27 @@ Your vault path must be accessible to Supersidian, e.g.:
 ```
 
 ### Python
-- Python 3.10+
-- Recommended to use a venv:
+- Python 3.8 or higher required
 
-```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+### Installation
+
+#### Option 1: Install from PyPI (Recommended)
+
+```bash
+pip install supersidian
 ```
 
-### supernote-tool
-Install via pip:
+This will install Supersidian and all its dependencies, including `supernotelib` (which provides `supernote-tool`).
 
+#### Option 2: Install from Source (For Development)
+
+```bash
+git clone https://github.com/jaygoldman/supersidian.git
+cd supersidian
+pip install -e .
 ```
-pip install supernotelib
-```
+
+The `-e` flag installs in editable mode, allowing you to modify the code and test changes immediately.
 
 Make sure `supernote-tool` is available on your PATH. More information in the [supernote-tool documentation](https://github.com/jya-dev/supernote-tool)
 
@@ -299,11 +305,17 @@ By default, all logs are written to a file:
 Supersidian runs quietly unless something goes wrong. This makes it suitable for scheduled or automated execution.
 
 ### Verbose Mode (Console Output)
-To see logs in the terminal while still writing to the log file, enable verbose mode by setting an environment variable:
+To see logs in the terminal while still writing to the log file, enable verbose mode with the `--verbose` flag:
 
+```bash
+supersidian --verbose
 ```
+
+Alternatively, you can set the environment variable:
+
+```bash
 export SUPERSIDIAN_VERBOSE=1
-python -m supersidian.bridge
+supersidian
 ```
 
 Verbose mode prints:
@@ -375,11 +387,22 @@ Supersidian supports multiple vaults (“bridges”) in parallel.
 <a id="running-supersidian"></a>
 ## ▶️ Running Supersidian
 
-From the project root:
+After installation, run Supersidian with:
 
+```bash
+supersidian
 ```
-source .venv/bin/activate
-python -m supersidian.bridge
+
+Or with verbose output:
+
+```bash
+supersidian --verbose
+```
+
+Check the version:
+
+```bash
+supersidian --version
 ```
 
 
@@ -398,7 +421,7 @@ Supersidian is designed to be run repeatedly in the background so your Obsidian 
 On macOS, the native way to run Supersidian on a schedule is with a **LaunchAgent**:
 
 1. Create a file at:
-   `~/Library/LaunchAgents/com.supersidian.bridge.plist`
+   `~/Library/LaunchAgents/com.supersidian.plist`
 2. Example contents (runs every 10 minutes):
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
@@ -406,16 +429,11 @@ On macOS, the native way to run Supersidian on a schedule is with a **LaunchAgen
    <plist version="1.0">
    <dict>
      <key>Label</key>
-     <string>com.supersidian.bridge</string>
-
-     <key>WorkingDirectory</key>
-     <string>/Users/you/Dev/supersidian</string>
+     <string>com.supersidian</string>
 
      <key>ProgramArguments</key>
      <array>
-       <string>/Users/you/Dev/supersidian/.venv/bin/python</string>
-       <string>-m</string>
-       <string>supersidian.bridge</string>
+       <string>/usr/local/bin/supersidian</string>
      </array>
 
      <key>StartInterval</key>
@@ -428,21 +446,24 @@ On macOS, the native way to run Supersidian on a schedule is with a **LaunchAgen
    </dict>
    </plist>
    ```
+
+   Note: If you installed with `pip install --user`, the path might be `~/.local/bin/supersidian` instead.
+
 3. Load it:
    ```bash
-   launchctl load ~/Library/LaunchAgents/com.supersidian.bridge.plist
+   launchctl load ~/Library/LaunchAgents/com.supersidian.plist
    ```
 
 #### macOS / Linux: cron
 If you prefer `cron`, you can add a line like this:
 
 ```bash
-*/10 * * * * cd /Users/you/Dev/supersidian && \
-  source .venv/bin/activate && \
-  python -m supersidian.bridge >> ~/.supersidian.cron.log 2>&1
+*/10 * * * * supersidian >> ~/.supersidian.cron.log 2>&1
 ```
 
 This runs Supersidian every 10 minutes, writing additional logs to `~/.supersidian.cron.log`.
+
+Note: Ensure the `supersidian` command is in your PATH. You may need to use the full path (e.g., `/usr/local/bin/supersidian` or `~/.local/bin/supersidian`).
 
 ### ❤️ Monitoring with healthchecks.io (optional)
 Supersidian doesn’t talk to healthchecks.io directly, but you can easily pair them using your scheduler. The idea:
@@ -462,9 +483,7 @@ Update your cron entry to wrap Supersidian with pings:
 ```bash
 */10 * * * * HC_URL=https://hc-ping.com/your-check-uuid && \
   curl -fsS "$HC_URL/start" -m 10 || true; \
-  cd /Users/you/Dev/supersidian && \
-  source .venv/bin/activate && \
-  python -m supersidian.bridge && \
+  supersidian && \
   curl -fsS "$HC_URL" -m 10 || \
   curl -fsS "$HC_URL/fail" -m 10 || true
 ```
@@ -485,10 +504,7 @@ HC_URL="https://hc-ping.com/your-check-uuid"
 
 curl -fsS "$HC_URL/start" -m 10 || true
 
-cd /Users/you/Dev/supersidian
-source .venv/bin/activate
-
-if python -m supersidian.bridge; then
+if supersidian; then
   curl -fsS "$HC_URL" -m 10 || true
 else
   curl -fsS "$HC_URL/fail" -m 10 || true
