@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.supersidian</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/supersidian</string>
+  </array>
+
+  <!-- Run every 10 minutes (600 seconds) -->
+  <key>StartInterval</key>
+  <integer>600</integer>
+
+  <!-- Log output to user's Logs directory -->
+  <key>StandardOutPath</key>
+  <string>/Users/YOU/Library/Logs/supersidian.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOU/Library/Logs/supersidian.err.log</string>
+
+  <!-- Run on load -->
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>

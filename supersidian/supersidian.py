@@ -24,11 +24,13 @@ from .storage import LocalTask, TaskSyncResult, get_known_task_ids, record_task_
 from .todo import TodoContext, provider_from_env
 from .sync import SyncContext, provider_from_env as sync_provider_from_env
 from .notes import NoteContext, NoteMetadata, StatusStats, provider_from_env as note_provider_from_env
+from .notifications import (
+    NotificationPayload,
+    NotificationSeverity,
+    NotificationContext,
+    providers_from_env as notification_providers_from_env,
+)
 from .__version__ import __version__
-
-import json
-import urllib.request
-import urllib.error
 
 # Load environment variables from project .env before reading them, using a simple KEY=VALUE parser
 ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
@@ -59,8 +61,6 @@ _load_env_from_file(ENV_PATH)
 
 # Determine verbose mode from environment variable SUPERSIDIAN_VERBOSE
 VERBOSE = os.environ.get("SUPERSIDIAN_VERBOSE", "0") == "1"
-WEBHOOK_URL = os.environ.get("SUPERSIDIAN_WEBHOOK_URL")
-WEBHOOK_TOPIC = os.environ.get("SUPERSIDIAN_WEBHOOK_TOPIC")
 
 # Notification mode: all, errors, none
 _raw_notify_mode = os.environ.get("SUPERSIDIAN_WEBHOOK_NOTIFICATIONS", "errors")
@@ -106,8 +106,7 @@ log = logging.getLogger("supersidian")
 
 if VERBOSE:
     log.debug(
-        f"Startup configuration: VERBOSE={VERBOSE}, NOTIFY_MODE='{NOTIFY_MODE}', "
-        f"WEBHOOK_URL={WEBHOOK_URL!r}, WEBHOOK_TOPIC={WEBHOOK_TOPIC!r}"
+        f"Startup configuration: VERBOSE={VERBOSE}, NOTIFY_MODE='{NOTIFY_MODE}'"
     )
 
 
@@ -474,7 +473,8 @@ def apply_replacements(text: str, repl: dict[str, str]) -> str:
     return pattern.sub(_sub, text)
 
 
-def send_notification(
+def send_notifications(
+    providers: list,
     bridge: BridgeConfig,
     notes_found: int,
     converted: int,
@@ -485,92 +485,53 @@ def send_notification(
     supernote_missing: bool,
     vault_missing: bool,
 ) -> None:
-    if not WEBHOOK_URL:
+    """Send notifications to all configured providers.
+    
+    Args:
+        providers: List of notification providers to use
+        bridge: Bridge configuration
+        notes_found: Number of notes discovered
+        converted: Number of notes converted
+        skipped: Number of notes skipped (up to date)
+        no_text: Number of notes with no recognized text
+        tool_missing: Number of notes where supernote-tool was missing
+        tool_failed: Number of notes where supernote-tool failed
+        supernote_missing: Whether the supernote path is missing
+        vault_missing: Whether the vault path is missing
+    """
+    if not providers:
         return
 
-    now = datetime.datetime.now().isoformat(timespec="seconds")
-    # Treat only structural issues as errors for the notification outcome; notes
-    # with no recognized text do not by themselves mark the run as [ERROR].
+    # Determine severity based on errors
     error_flag = bool(tool_missing or tool_failed or supernote_missing or vault_missing)
-    outcome = "ERROR" if error_flag else "OK"
+    severity = NotificationSeverity.ERROR if error_flag else NotificationSeverity.INFO
 
-    # Human-readable vault label comes from the vault folder name
-    vault_name = bridge.vault_path.name
-
-    # Build a multi-line, ntfy-friendly message. Errors are shown first so they
-    # are immediately visible in push notifications, followed by the run
-    # breakdown.
-    lines: list[str] = [
-        f"Supersidian: {vault_name} - [{outcome}]",
-        "",
-    ]
-
-    errors: list[str] = []
-    if tool_missing:
-        errors.append("supernote-tool not found")
-    if tool_failed:
-        errors.append("supernote-tool failed")
-    if supernote_missing:
-        errors.append("Supernote path is missing")
-    if vault_missing:
-        errors.append("Obsidian vault is missing")
-
-    if errors:
-        if len(errors) == 1:
-            lines.append(f"Error: {errors[0]}")
-        else:
-            lines.append("Errors:")
-            for e in errors:
-                lines.append(f"- {e}")
-        lines.append("")
-
-    # Append the run breakdown after any error section
-    lines.extend(
-        [
-            f"Notes: {notes_found}",
-            f"Converted: {converted}",
-            f"Skipped: {skipped}",
-            f"No text: {no_text}",
-        ]
+    # Build notification payload
+    payload = NotificationPayload(
+        bridge_name=bridge.name,
+        vault_name=bridge.vault_path.name,
+        severity=severity,
+        timestamp=datetime.datetime.now().isoformat(timespec="seconds"),
+        notes_found=notes_found,
+        converted=converted,
+        skipped=skipped,
+        no_text=no_text,
+        tool_missing=tool_missing,
+        tool_failed=tool_failed,
+        supernote_missing=supernote_missing,
+        vault_missing=vault_missing,
     )
 
-    message = "\n".join(lines)
-
-    payload = {
-        "bridge": bridge.name,
-        "timestamp": now,
-        "notes_found": notes_found,
-        "converted": converted,
-        "skipped": skipped,
-        "no_text": no_text,
-        "tool_missing": tool_missing,
-        "tool_failed": tool_failed,
-        "supernote_missing": supernote_missing,
-        "vault_missing": vault_missing,
-        "title": f"Supersidian: {bridge.name}",
-        "message": message,
-    }
-    if WEBHOOK_TOPIC:
-        payload["topic"] = WEBHOOK_TOPIC
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        WEBHOOK_URL,
-        data=data,
-        headers={"Content-Type": "application/json"},
-    )
-
-    if VERBOSE:
-        log.debug(
-            f"[{bridge.name}] sending notification to {WEBHOOK_URL} "
-            f"with payload: {json.dumps(payload, ensure_ascii=False)}"
-        )
-
-    try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            log.info(f"[{bridge.name}] notification sent (status={getattr(resp, 'status', 'unknown')})")
-    except Exception as e:
-        log.warning(f"[{bridge.name}] failed to send notification to {WEBHOOK_URL}: {e}")
+    # Send to all configured providers
+    ctx = NotificationContext(bridge_name=bridge.name)
+    for provider in providers:
+        try:
+            provider.send(payload, ctx)
+        except Exception as e:
+            # Providers should never raise, but catch just in case
+            log.warning(
+                f"[{bridge.name}] notification provider {provider.name} raised exception: {e}"
+            )
 
 
 def export_images(note_path: Path, bridge: BridgeConfig) -> list[Path]:
@@ -735,7 +696,7 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig, note_provider, not
     return "converted"
 
 
-def process_bridge(bridge: BridgeConfig) -> bool:
+def process_bridge(bridge: BridgeConfig, notification_providers: list) -> bool:
     if not bridge.enabled:
         log.info(f"[{bridge.name}] SKIP disabled")
         return False
@@ -774,7 +735,8 @@ def process_bridge(bridge: BridgeConfig) -> bool:
             note_provider.write_status_note(stats, note_ctx)
         # Notify if configured
         if NOTIFY_MODE != "none":
-            send_notification(
+            send_notifications(
+                notification_providers,
                 bridge,
                 notes_found=0,
                 converted=0,
@@ -794,7 +756,8 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         log.warning(f"[{bridge.name}] vault_path does not exist: {bridge.vault_path}")
         # Cannot write a status note without a vault, but can still notify
         if NOTIFY_MODE != "none":
-            send_notification(
+            send_notifications(
+                notification_providers,
                 bridge,
                 notes_found=0,
                 converted=0,
@@ -859,7 +822,8 @@ def process_bridge(bridge: BridgeConfig) -> bool:
     # summary but do not, by themselves, mark the run as failed.
     errorish = bool(tool_missing or tool_failed)
     if NOTIFY_MODE == "all" or (NOTIFY_MODE == "errors" and errorish):
-        send_notification(
+        send_notifications(
+            notification_providers,
             bridge,
             notes_found=len(note_files),
             converted=converted,
@@ -905,13 +869,16 @@ def main() -> None:
 
     cfg = load_config()
 
+    # Load notification providers once for all bridges
+    notification_providers = notification_providers_from_env()
+
     # Ping healthcheck at start of run, if configured
     ping_healthcheck("/start")
 
     errorish = False
     try:
         for bridge in cfg.bridges:
-            bridge_error = process_bridge(bridge)
+            bridge_error = process_bridge(bridge, notification_providers)
             if bridge_error:
                 errorish = True
     except Exception:

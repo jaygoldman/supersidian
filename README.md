@@ -2,23 +2,27 @@
 
 > *Write naturally on your Supernote. Get beautifully formatted, instantly searchable notes in Obsidian and todos in your task app of choice automatically.*
 
-Supersidian is a fully automated pipeline that transforms **Supernote Real-Time Recognition notes** into clean, structured **Markdown** inside **Obsidian**, preserving your notebook hierarchy, applying intelligent formatting fixes, and correcting common recognition errors. Supersidian also identifies tasks in your notes and syncs them to your **Obsidian** vault and, optionally, your todo app of choice. 
+Supersidian is a fully automated pipeline that transforms **Supernote Real-Time Recognition notes** into clean, structured **Markdown** inside **Obsidian**, preserving your notebook hierarchy, applying intelligent formatting fixes, and correcting common recognition errors. Supersidian also identifies tasks in your notes and syncs them to your **Obsidian** vault and, optionally, your todo app of choice.
 
-Supersidian watches your Supernote-synced Dropbox folder, extracts recognized text using [supernote-tool](https://github.com/jya-dev/supernote-tool), cleans it up, fixes headings and indentation, applies custom corrections you maintain inside Obsidian, and writes Markdown files into your Obsidian vault and tasks into your todo app of choice.
+With a flexible **plugin architecture**, Supersidian supports different sync services, note apps, and todo platforms, making it adaptable to your workflow.
+
+Supersidian requires a fairly high degree of technical knowledge to install. **Important note: no support is provided. Please do not contact me for assistance.** 
 
 ## Table of Contents
 
 - [What problem does Supersidian solve?](#what-problem-does-supersidian-solve)
 - [How Supersidian works](#how-supersidian-works)
-- [Tasks](#tasks)
-- [Requirements](#requirements)
-- [Logging](#logging)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Running Supersidian](#running-supersidian)
 - [Folder Strategy](#folder-strategy)
 - [Editing Corrections Inside Obsidian](#editing-corrections-inside-obsidian)
 - [Supersidian Status Notes](#supersidian-status-notes)
-- [Notifications & Webhook Integration](#notifications--webhook-integration)
+- [Plugin Architecture](#plugin-architecture)
+- [Logging](#logging)
+- [Healthcheck Monitoring](#healthcheck-monitoring)
+- [Scheduling](#scheduling)
 - [License](#license)
 
 ---
@@ -57,12 +61,18 @@ Using **Real-Time Recognition** notes, optionally in Markdown format with struct
 --- Third level
 ```
 
-### 2. Supernote syncs notes into Dropbox
-Your device must be configured to sync to Dropbox, which is currently the only support sync service (add an [Issue](https://github.com/jaygoldman/supersidian/issues) to request a new service). You can configure your Dropbox location in your .env file (see [Configuration](#configuration)). Typically, your notes will be in this location:
+### 2. Supernote syncs notes to your computer
+Your device syncs notes to a local folder. Supersidian supports:
+- **Dropbox** (recommended) - Automatic cloud sync
+- **Local filesystem** - Manual file transfer or other sync methods
+
+Typically, your notes will be in:
 
 ```
 Dropbox/Supernote/Note/<YourFolderStructure>
 ```
+
+See [Plugin Architecture](#plugin-architecture) for more sync options.
 
 ### 3. Supersidian processes only updated `.note` files
 It compares modified timestamps and skips notes that haven’t changed relative to their Obsidian counterparts.
@@ -87,9 +97,7 @@ Supersidian:
 - capitalizes the first letter of each separated line
 - converts `[ ] task` and `[x] task` lines into proper Obsidian tasks (`- [ ] Task`, `- [x] Task`)
 
----
-<a id="tasks"></a>
-## Tasks
+### 6. Tasks
 Supersidian detects Supernote lines starting with `[ ]` or `[x]` and transforms them into Obsidian tasks:
 ```
 [ ] follow up with client
@@ -100,111 +108,22 @@ becomes:
 - [ ] Follow up with client
 - [x] Send agenda
 ```
-```
+
 This works alongside nested bullets and aggressive cleanup.
-```
 
-### 📝 Task Extraction and Todo App Sync
-Supersidian can sync your tasks into your todo app of choice:
+Tasks are automatically synced to Obsidian. You can optionally sync them to external task apps like Todoist — see [Plugin Architecture](#plugin-architecture) for details.
 
-#### ✔ Local Task Registry (SQLite)
-Every detected task is assigned a stable local ID and stored in a lightweight local SQLite database. This enables:
-- idempotent processing across runs
-- preventing duplicate syncs
-- future integration with multiple providers
+### 7. Supersidian Folder Creation
 
-#### ✔ Only Open Tasks Sync to other apps
-Supersidian syncs **only unchecked tasks** (`[ ]`) to your todo app.
-Completed tasks (`[x]`) are **ignored** for sync purposes and stored locally only. This keeps your todo inbox clean and prevents noise.
+On the first run, Supersidian automatically creates a `Supersidian/` folder in each enabled vault containing:
 
-#### ✔ Todoist Integration
-If you set:
-```
-SUPERSIDIAN_TODO_PROVIDER=todoist
-SUPERSIDIAN_TODOIST_API_TOKEN=your_api_token
-```
-new open tasks are automatically sent to your Todoist inbox.
-Each created Todoist task includes:
-- the task content
-- labels: `supersidian` and `vault:<VaultName>`
-- a description containing vault, note path, line number, and local task ID
+- **Status Note** - Run statistics and sync status (updated on each run)
+- **Replacements Note** - Custom word corrections that you can edit
 
-If no provider is configured, or Todoist is unavailable, Supersidian falls back to a safe no‑op provider and marks tasks as "skipped" without raising errors.
+These files are created automatically and don't require manual setup.
 
-##### Todoist API Tokens
-Instructions on [finding your Todoist API Token](https://www.todoist.com/help/articles/find-your-api-token-Jpzx9IIlB) are in their support docs.
-
-#### ✔ Idempotent Sync
-Each task is synced only once. Supersidian never resends a task that has already been assigned a Todoist ID.
-
-### 🔌 Plugin Architecture for Task Providers
-Supersidian includes a small plugin system for task services. By default it ships with a fully functional **Todoist provider**, but the same mechanism can be used to integrate with services like **Asana**, **Monday.com**, **ClickUp**, **Things**, **Notion**, and others.
-
-#### ✔ How Providers Fit In
-Providers live under:
-
-```
-supersidian/todo/
-```
-
-Supersidian core:
-- extracts tasks from Markdown into `LocalTask` objects
-- determines which ones are new (using the SQLite registry)
-- hands the new tasks to the active provider
-
-The provider:
-- receives a list of `LocalTask` objects plus a `TodoContext` (bridge + vault info)
-- creates corresponding tasks in the external system
-- returns `TaskSyncResult` objects describing what happened per task
-
-Supersidian then persists those results back into the SQLite registry.
-
-#### ✔ Selecting a Provider
-You choose a provider via an environment variable in `.env`:
-
-```
-SUPERSIDIAN_TODO_PROVIDER=todoist
-```
-
-If this is unset or invalid, Supersidian automatically uses a safe **no-op provider** that marks tasks as skipped instead of raising errors.
-
-#### ✔ Writing Your Own Provider
-To add support for a new external task platform:
-
-1. Create a new file under `supersidian/todo/`, for example:
-   ```
-   supersidian/todo/asana.py
-   ```
-2. Implement a class that subclasses `BaseTodoProvider` from `supersidian/todo/base.py`:
-   ```python
-   from .base import BaseTodoProvider, TodoContext
-   from ..storage import LocalTask, TaskSyncResult
-
-   class AsanaProvider(BaseTodoProvider):
-       name = "asana"
-
-       def sync_tasks(self, tasks, ctx):
-           results = []
-           for t in tasks:
-               # Call Asana's API here to create a task
-               external_id = "..."  # Replace with actual ID from Asana
-               results.append(TaskSyncResult(
-                   local_id=t.local_id,
-                   provider=self.name,
-                   external_id=external_id,
-                   status="created",
-                   error=None,
-               ))
-           return results
-   ```
-3. Register the provider name in `supersidian/todo/__init__.py` so it can be resolved from `SUPERSIDIAN_TODO_PROVIDER`.
-4. Open a pull request adding your provider.
-
-Because Supersidian handles idempotency and local history, providers can remain small and focused: receive tasks, create them in the external system, return results.
-
----
-### 6. Custom word corrections
-Supersidian will automatically create a Supersidian folder inside your vault, including a special file:
+### 8. Custom word corrections
+The Supersidian folder in your vault includes a special file:
 
 ```
 Supersidian Replacements.md
@@ -220,7 +139,7 @@ That file will include a comment with the format for your replacement dictionary
 
 Supersidian applies these **after** formatting. It uses whole-word replacement to avoid mangling substrings.
 
-### 7. Markdown is written into Obsidian
+### 9. Markdown is written into Obsidian
 Supersidian mirrors your Supernote folder structure:
 
 ```
@@ -229,54 +148,27 @@ Supernote/Note/Acme/Products/Foo.note
 ```
 
 ---
-<a id="requirements"></a>
-## 🛠 Requirements
+<a id="installation"></a>
+## 🛠 Installation
 
-> Supersidian is cross‑platform. It runs on macOS, Linux, or Windows — anywhere Python and a local Dropbox‑synced folder are available.
+### Requirements
 
-### Supernote
-- Real-Time Recognition notes enabled
-- Cloud Sync set to **Dropbox**
-- Ensure your notes sync to:
+- **Python 3.8+** required
+- **Supernote device** with Real-Time Recognition enabled
+- **Sync service** - Dropbox (recommended) or manual file transfer
+- **Note app** - Obsidian (recommended) or plain Markdown storage
 
-```
-Dropbox/Supernote/Note/
-```
+> Supersidian is cross-platform and runs on macOS, Linux, and Windows.
 
-### Dropbox (macOS, Windows, Linux)
-Supersidian can run on any OS where Dropbox syncs note files locally. This includes:
-- macOS (native Dropbox client)
-- Windows (native Dropbox client)
-- Linux (official and community-supported Dropbox clients)
-
-As long as your Supernote directory appears in a locally synced Dropbox folder, Supersidian will work.
-
-### Obsidian
-You can sync your vault using:
-- Obsidian Sync **(recommended)**
-- iCloud
-- Dropbox
-
-Your vault path must be accessible to Supersidian, e.g.:
-
-```
-~/Obsidian/Acme
-```
-
-### Python
-- Python 3.8 or higher required
-
-### Installation
-
-#### Option 1: Install from PyPI (Recommended)
+### Install from PyPI (Recommended)
 
 ```bash
 pip install supersidian
 ```
 
-This will install Supersidian and all its dependencies, including `supernotelib` (which provides `supernote-tool`).
+This installs Supersidian and all dependencies, including `supernotelib` (which provides `supernote-tool`).
 
-#### Option 2: Install from Source (For Development)
+### Install from Source (For Development)
 
 ```bash
 git clone https://github.com/jaygoldman/supersidian.git
@@ -284,110 +176,58 @@ cd supersidian
 pip install -e .
 ```
 
-The `-e` flag installs in editable mode, allowing you to modify the code and test changes immediately.
+The `-e` flag installs in editable mode for development.
 
-Make sure `supernote-tool` is available on your PATH. More information in the [supernote-tool documentation](https://github.com/jya-dev/supernote-tool)
-
-
----
-<a id="logging"></a>
-## 📝 Logging
-
-Supersidian includes built‑in logging so you can monitor activity and diagnose issues.
-
-### Default Behavior
-By default, all logs are written to a file:
-
-```
-~/.supersidian.log
-```
-
-Supersidian runs quietly unless something goes wrong. This makes it suitable for scheduled or automated execution.
-
-### Verbose Mode (Console Output)
-To see logs in the terminal while still writing to the log file, enable verbose mode with the `--verbose` flag:
+### Verify Installation
 
 ```bash
-supersidian --verbose
+supersidian --version
 ```
-
-Alternatively, you can set the environment variable:
-
-```bash
-export SUPERSIDIAN_VERBOSE=1
-supersidian
-```
-
-Verbose mode prints:
-- conversions
-- skips
-- warnings
-- errors
-
-If `SUPERSIDIAN_VERBOSE` is not set to `1`, Supersidian suppresses console output and logs only to the file.
-
-### Log Format
-Each log entry includes:
-
-```
-2025-01-01 12:34:56 [INFO] message text
-```
-
-The log includes:
-- successful conversions
-- skipped notes
-- text extraction errors
-- replacement loading issues
-- supernote‑tool failures
-
-Logs persist between runs, allowing long‑term auditing of your sync pipeline.
 
 ---
-<a id="configuration"></a>
-## ⚙️ Configuration
+<a id="quick-start"></a>
+## 🚀 Quick Start
 
-Supersidian uses two files:
+### 1. Configure Environment
 
-### `.env`
-Environment variables (ignored by Git):
+Copy the example environment file:
 
-```
-SUPERSIDIAN_SUPERNOTE_ROOT=/Users/you/Library/CloudStorage/Dropbox/Supernote/Note
-SUPERSIDIAN_CONFIG_PATH=./supersidian.config.json
-
-# Optional: webhook configuration
-SUPERSIDIAN_WEBHOOK_URL=
-SUPERSIDIAN_WEBHOOK_TOPIC=
-# One of: errors, all, none (default: errors)
-SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors
+```bash
+cp .env.example .env
 ```
 
-### `supersidian.config.json`
-Defines one or more “bridges” mapping Supernote folders to Obsidian vaults:
+Edit `.env` and set your Supernote path:
 
+```bash
+SUPERSIDIAN_SUPERNOTE_ROOT=/Users/you/Dropbox/Supernote/Note
 ```
+
+### 2. Configure Bridges
+
+Copy the example configuration:
+
+```bash
+cp supersidian.config.example.json supersidian.config.json
+```
+
+Edit `supersidian.config.json` to define your vault mappings:
+
+```json
 {
   "bridges": [
     {
-      "name": "acme",
+      "name": "personal",
       "enabled": true,
-      "supernote_subdir": "Acme",
-      "vault_path": "/Users/you/Obsidian/Acme",
-      "aggressive_cleanup": true,
-      "spellcheck": false,
-      "extra_tags": ["acme"]
+      "supernote_subdir": "Personal",
+      "vault_path": "/Users/you/Documents/Obsidian/Personal",
+      "extra_tags": ["supernote"],
+      "aggressive_cleanup": false
     }
   ]
 }
 ```
 
-Supersidian supports multiple vaults (“bridges”) in parallel.
-
----
-<a id="running-supersidian"></a>
-## ▶️ Running Supersidian
-
-After installation, run Supersidian with:
+### 3. Run Once
 
 ```bash
 supersidian
@@ -399,121 +239,140 @@ Or with verbose output:
 supersidian --verbose
 ```
 
-Check the version:
+### 4. Schedule Automatic Runs
+
+See [Scheduling](#scheduling) for cron or launchd setup.
+
+---
+<a id="configuration"></a>
+## ⚙️ Configuration
+
+Supersidian uses two configuration files:
+
+### `.env` - Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+**Core Settings:**
+```bash
+# Path to your Supernote files
+SUPERSIDIAN_SUPERNOTE_ROOT=/Users/you/Dropbox/Supernote/Note
+
+# Path to bridges configuration (optional, default: supersidian.config.json)
+SUPERSIDIAN_CONFIG_PATH=./supersidian.config.json
+```
+
+**Provider Settings:**
+```bash
+# Sync provider: dropbox, local
+SUPERSIDIAN_SYNC_PROVIDER=dropbox
+
+# Note provider: obsidian, markdown
+SUPERSIDIAN_NOTE_PROVIDER=obsidian
+
+# Todo provider: noop, todoist
+SUPERSIDIAN_TODO_PROVIDER=noop
+
+# Notification providers (comma-separated): webhook, noop
+SUPERSIDIAN_NOTIFICATION_PROVIDERS=webhook
+```
+
+**Todoist Settings (if using todoist provider):**
+```bash
+SUPERSIDIAN_TODOIST_API_TOKEN=your_token_here
+```
+
+**Notification Settings (if using webhook provider):**
+```bash
+SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/your-topic
+SUPERSIDIAN_WEBHOOK_TOPIC=  # Optional topic field
+SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors  # all, errors, or none
+```
+
+See `.env.example` for all available options.
+
+### `supersidian.config.json` - Bridge Configuration
+
+Copy `supersidian.config.example.json` to `supersidian.config.json` and configure your bridges.
+
+Each bridge maps a Supernote folder to a note vault:
+
+```json
+{
+  "bridges": [
+    {
+      "name": "personal",
+      "enabled": true,
+      "supernote_subdir": "Personal",
+      "vault_path": "/Users/you/Obsidian/Personal",
+      "extra_tags": ["supernote", "personal"],
+      "aggressive_cleanup": false,
+      "export_images": true,
+      "images_subdir": "Supersidian/Assets"
+    },
+    {
+      "name": "work",
+      "enabled": true,
+      "supernote_subdir": "Work",
+      "vault_path": "/Users/you/Obsidian/Work",
+      "extra_tags": ["work"],
+      "aggressive_cleanup": true
+    }
+  ]
+}
+```
+
+**Bridge Options:**
+- `name` - Unique identifier for the bridge
+- `enabled` - Set to `false` to temporarily disable
+- `supernote_subdir` - Folder within `SUPERSIDIAN_SUPERNOTE_ROOT`
+- `vault_path` - Absolute path to your note vault
+- `extra_tags` - Additional tags for notes from this bridge
+- `aggressive_cleanup` - More aggressive line unwrapping (optional)
+- `export_images` - Export note pages as PNG images (optional)
+- `images_subdir` - Where to store images (optional)
+
+Supersidian supports multiple bridges running in parallel.
+
+---
+<a id="running-supersidian"></a>
+## ▶️ Running Supersidian
+
+After configuration, run Supersidian with:
+
+```bash
+supersidian
+```
+
+With verbose output:
+
+```bash
+supersidian --verbose
+```
+
+Check version:
 
 ```bash
 supersidian --version
 ```
 
+### What Happens During a Run
 
-It will:
-- scan all enabled bridges
-- detect updated Supernote notes
-- extract + clean text
-- apply replacements
-- write Markdown
-- skip unchanged notes
+Supersidian:
+1. Scans all enabled bridges
+2. Discovers Supernote `.note` files via sync provider
+3. Compares timestamps (skips unchanged notes)
+4. Extracts text using `supernote-tool`
+5. Cleans and formats Markdown
+6. Applies custom word replacements
+7. Extracts and syncs tasks (if todo provider configured)
+8. Writes notes via note provider
+9. Updates status notes
+10. Sends notifications (if configured)
 
-### ⏱ Scheduling Supersidian
-Supersidian is designed to be run repeatedly in the background so your Obsidian vault stays in sync with your Supernote. The core script is a one-shot process; you attach your own scheduler.
+For automated execution, see [Scheduling](#scheduling).
 
-#### macOS: launchd (recommended)
-On macOS, the native way to run Supersidian on a schedule is with a **LaunchAgent**:
-
-1. Create a file at:
-   `~/Library/LaunchAgents/com.supersidian.plist`
-2. Example contents (runs every 10 minutes):
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-   <plist version="1.0">
-   <dict>
-     <key>Label</key>
-     <string>com.supersidian</string>
-
-     <key>ProgramArguments</key>
-     <array>
-       <string>/usr/local/bin/supersidian</string>
-     </array>
-
-     <key>StartInterval</key>
-     <integer>600</integer>
-
-     <key>StandardOutPath</key>
-     <string>/Users/you/Library/Logs/supersidian.log</string>
-     <key>StandardErrorPath</key>
-     <string>/Users/you/Library/Logs/supersidian.err.log</string>
-   </dict>
-   </plist>
-   ```
-
-   Note: If you installed with `pip install --user`, the path might be `~/.local/bin/supersidian` instead.
-
-3. Load it:
-   ```bash
-   launchctl load ~/Library/LaunchAgents/com.supersidian.plist
-   ```
-
-#### macOS / Linux: cron
-If you prefer `cron`, you can add a line like this:
-
-```bash
-*/10 * * * * supersidian >> ~/.supersidian.cron.log 2>&1
-```
-
-This runs Supersidian every 10 minutes, writing additional logs to `~/.supersidian.cron.log`.
-
-Note: Ensure the `supersidian` command is in your PATH. You may need to use the full path (e.g., `/usr/local/bin/supersidian` or `~/.local/bin/supersidian`).
-
-### ❤️ Monitoring with healthchecks.io (optional)
-Supersidian doesn’t talk to healthchecks.io directly, but you can easily pair them using your scheduler. The idea:
-
-- healthchecks.io watches **whether Supersidian runs and exits cleanly**
-- Supersidian itself continues to handle note conversion, logging, and notifications
-
-#### Example: cron + healthchecks.io
-Assume you created a check in healthchecks.io and got this URL:
-
-```text
-https://hc-ping.com/your-check-uuid
-```
-
-Update your cron entry to wrap Supersidian with pings:
-
-```bash
-*/10 * * * * HC_URL=https://hc-ping.com/your-check-uuid && \
-  curl -fsS "$HC_URL/start" -m 10 || true; \
-  supersidian && \
-  curl -fsS "$HC_URL" -m 10 || \
-  curl -fsS "$HC_URL/fail" -m 10 || true
-```
-
-This pattern:
-- sends a `/start` ping before Supersidian runs
-- sends a success ping on exit code 0
-- sends a `/fail` ping if the process exits non‑zero
-
-#### Example: launchd + wrapper script
-For `launchd`, you can point `ProgramArguments` to a small shell script, for example:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-HC_URL="https://hc-ping.com/your-check-uuid"
-
-curl -fsS "$HC_URL/start" -m 10 || true
-
-if supersidian; then
-  curl -fsS "$HC_URL" -m 10 || true
-else
-  curl -fsS "$HC_URL/fail" -m 10 || true
-fi
-```
-
-Then point your LaunchAgent’s `ProgramArguments` at this script instead of calling Python directly.
-
-Using healthchecks.io this way turns Supersidian into a monitored background service: you’ll be alerted if the job stops running, crashes, or begins failing consistently.
+Supersidian is designed to run repeatedly in the background to keep your vault in sync.
 
 ---
 <a id="folder-strategy"></a>
@@ -524,7 +383,7 @@ If your Supernote contains:
 
 ```
 Acme/
-  Guardrail/
+  Phoenix/
     Intake/
     Playbooks/
 ```
@@ -533,7 +392,7 @@ Your Obsidian vault will contain:
 
 ```
 Acme/
-  Guardrail/
+  Phoenix/
     Intake/
     Playbooks/
 ```
@@ -545,10 +404,16 @@ If you later *move* a note inside Obsidian, and then update the corresponding `.
 <a id="editing-corrections-inside-obsidian"></a>
 ## 🔄 Editing Corrections Inside Obsidian
 
-Users maintain their own correction list directly inside their vault:
+Users maintain their own correction list directly inside their vault, in a special file created automatically by Supersidian:
 
 ```
 Supersidian Replacements.md
+```
+
+For example, for a bridge named `acme`:
+
+```
+Obsidian/Acme/Supersidian/Replacements - acme.md
 ```
 
 This enables:
@@ -579,7 +444,7 @@ Supersidian Status - <bridge name>.md
 For example, for a bridge named `acme`:
 
 ```
-Obsidian/Acme/Supersidian Status - acme.md
+Obsidian/Acme/Supersidian/Status - acme.md
 ```
 
 ### What the status note contains
@@ -619,109 +484,256 @@ This gives you real‑time visibility:
 It allows monitoring directly inside Obsidian without reading log files.
 
 ---
-<a id="notifications--webhook-integration"></a>
-## 🔔 Notifications & Webhook Integration
+<a id="plugin-architecture"></a>
+## 🔌 Plugin Architecture
 
-Supersidian can optionally send notifications when something goes wrong during a run.  
-If a webhook URL is provided, Supersidian will POST a JSON payload describing the errors.
+Supersidian uses a flexible plugin system for four integration points:
 
-### Enabling Notifications
+### Sync Providers
 
-Set environment variables in your `.env` file:
+Control how Supersidian accesses your note files:
 
-```
-SUPERSIDIAN_WEBHOOK_URL=https://your-webhook-endpoint
-SUPERSIDIAN_WEBHOOK_TOPIC=optional-topic-name
-SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors
-```
+- **`dropbox`** (default) - Dropbox-synced local folder
+- **`local`** - Direct filesystem access (manual sync, other services)
 
-- `SUPERSIDIAN_WEBHOOK_URL` (required to enable notifications) is any HTTP endpoint that accepts JSON.
-- `SUPERSIDIAN_WEBHOOK_TOPIC` (optional) is a logical topic or channel name used by services like ntfy.sh.
-- `SUPERSIDIAN_WEBHOOK_NOTIFICATIONS` controls when Supersidian sends notifications and can be:
-  - `errors` (default): send notifications only for runs with structural errors (missing tool, tool failures, missing Supernote or vault paths).
-  - `all`: send a summary notification for **every** run, even when everything succeeds.
-  - `none`: never send notifications, even if `SUPERSIDIAN_WEBHOOK_URL` is set.
-
-This can be any HTTP endpoint that accepts JSON:
-- ntfy.sh
-- a Slack/Discord relay
-- IFTTT or Zapier webhook endpoints
-- a custom server or home‑automation rule
-
-If `SUPERSIDIAN_WEBHOOK_URL` is **not** set, notifications are disabled.
-
-### What triggers a notification?
-
-By default (`SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors`), a webhook is sent only if **structural errors occur**:
-
-- Supernote folder is missing
-- Vault folder is missing
-- `supernote-tool` is missing
-- `supernote-tool` fails on one or more notes
-- A note contains no extractable Real‑Time Recognition text
-
-Clean runs (all converted or skipped) do **not** trigger notifications.
-
-### JSON Payload Format
-
-Supersidian sends a POST request with the following structure:
-
-```json
-{
-  "bridge": "acme",
-  "timestamp": "2025-12-01T22:34:56",
-  "notes_found": 23,
-  "converted": 2,
-  "skipped": 21,
-  "no_text": 1,
-  "tool_missing": 0,
-  "tool_failed": 1,
-  "supernote_missing": false,
-  "vault_missing": false
-}
+**Configuration:**
+```bash
+SUPERSIDIAN_SYNC_PROVIDER=dropbox  # or: local
 ```
 
-This provides enough detail for dashboards, alerts, or automation responses.
+### Note Providers
 
-### Example: ntfy.sh
+Control how notes are written and formatted:
 
-Add this to `.env`:
+- **`obsidian`** (default) - Obsidian with YAML frontmatter, deep links, custom replacements
+- **`markdown`** - Plain Markdown files without app-specific features
 
-```
-SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/
-SUPERSIDIAN_WEBHOOK_TOPIC=supersidian-alerts
-SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors
-```
-
-Then subscribe from any device:
-
-```
-curl -s https://ntfy.sh/supersidian-alerts/json
+**Configuration:**
+```bash
+SUPERSIDIAN_NOTE_PROVIDER=obsidian  # or: markdown
 ```
 
-You will receive real‑time alerts like:
+### Todo Providers
 
-```
-{"bridge":"acme","converted":2,"no_text":1,"tool_failed":1,"timestamp":"2025‑12‑01T22:34:56"}
-```
+Control where tasks are synced:
 
-### Example: Local Script Trigger
+- **`noop`** (default) - No external task sync
+- **`todoist`** - Sync tasks to Todoist
 
-If you want Supersidian to trigger a local script instead of a network webhook, use a tiny local HTTP listener such as:
-
-```
-python3 -m http.server 9000
-```
-
-Then set:
-
-```
-SUPERSIDIAN_WEBHOOK_URL=http://localhost:9000
+**Configuration:**
+```bash
+SUPERSIDIAN_TODO_PROVIDER=todoist
+SUPERSIDIAN_TODOIST_API_TOKEN=your_token_here
 ```
 
-Your script can then respond however you prefer.
+**Features:**
+- Local SQLite task registry for idempotent sync
+- Only open tasks (`[ ]`) are synced to external apps
+- Completed tasks (`[x]`) stay local only
+- Safe no-op fallback if provider unavailable
 
-Notifications allow you to monitor sync reliability even when Supersidian runs unattended (e.g., as a scheduled job).
+See [PROVIDERS.md](PROVIDERS.md) for writing custom todo providers.
+
+### Notification Providers
+
+Control how you receive run notifications:
+
+- **`webhook`** - Generic HTTP webhooks (ntfy.sh, custom endpoints)
+- **`noop`** - No notifications
+
+**Configuration:**
+```bash
+SUPERSIDIAN_NOTIFICATION_PROVIDERS=webhook
+SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/your-topic
+SUPERSIDIAN_WEBHOOK_NOTIFICATIONS=errors  # all, errors, or none
+```
+
+**Notification Modes:**
+- `errors` (default) - Notify only on structural errors (missing folders, tool failures)
+- `all` - Notify on every run
+- `none` - Disable notifications
+
+**Example: ntfy.sh**
+```bash
+SUPERSIDIAN_WEBHOOK_URL=https://ntfy.sh/supersidian-alerts
+```
+
+See [PROVIDERS.md](PROVIDERS.md) for writing custom notification providers.
+
+### Why Plugin Architecture?
+
+- **Flexibility** - Mix and match providers based on your workflow
+- **Extensibility** - Easy to add support for new services
+- **No Breaking Changes** - Defaults preserve existing behavior
+
+### Future Providers
+
+The architecture is ready for additional providers:
+- **Sync**: iCloud, Google Drive, OneDrive, Syncthing
+- **Notes**: Notion, Logseq, Joplin, Bear
+- **Todo**: Asana, ClickUp, Things, Notion
+- **Notifications**: Slack, Discord, Email, Telegram, Pushover
+
+See [PROVIDERS.md](PROVIDERS.md) for detailed examples and best practices.
+
+---
+<a id="logging"></a>
+## 📝 Logging
+
+Supersidian includes built-in logging for monitoring and debugging.
+
+### Default Log Location
+
+Logs are written to:
+- **macOS**: `~/Library/Logs/supersidian/supersidian.log`
+- **Linux**: `~/.local/share/supersidian/logs/supersidian.log`
+- **Fallback**: `~/.supersidian.log`
+
+By default, Supersidian runs quietly (no console output), making it suitable for scheduled execution.
+
+### Verbose Mode
+
+Enable verbose output to see logs in the terminal:
+
+**Option 1: Command line flag**
+```bash
+supersidian --verbose
+```
+
+**Option 2: Environment variable**
+```bash
+export SUPERSIDIAN_VERBOSE=1
+supersidian
+```
+
+Verbose mode shows:
+- Conversions and skips
+- Warnings and errors
+- Provider activity
+- Notification status
+
+### Custom Log Location
+
+Set a custom log path:
+
+```bash
+SUPERSIDIAN_LOG_PATH=/path/to/your/supersidian.log
+```
+
+### Log Format
+
+Each entry includes timestamp, level, and message:
+
+```
+2025-12-08 14:23:45 [INFO] [personal] OK Note.note → /path/to/vault/Note.md
+2025-12-08 14:23:46 [WARNING] [work] skipped 5 notes (up to date)
+```
+
+Logs persist between runs for long-term auditing.
+
+---
+<a id="healthcheck-monitoring"></a>
+## ♥️ Healthcheck Monitoring
+
+Supersidian includes built-in support for healthcheck monitoring services like [healthchecks.io](https://healthchecks.io).
+
+### Configuration
+
+Set the healthcheck URL in `.env`:
+
+```bash
+SUPERSIDIAN_HEALTHCHECK_URL=https://hc-ping.com/your-uuid
+```
+
+### How It Works
+
+Supersidian automatically pings:
+- **`/start`** - When a run begins
+- **Base URL** - When a run succeeds
+- **`/fail`** - When a run fails
+
+This lets healthchecks.io track:
+- Whether Supersidian is running on schedule
+- Whether runs are succeeding or failing
+- Duration of each run
+
+### Example
+
+1. Create a check at healthchecks.io
+2. Get your ping URL: `https://hc-ping.com/abc123...`
+3. Add to `.env`:
+   ```bash
+   SUPERSIDIAN_HEALTHCHECK_URL=https://hc-ping.com/abc123...
+   ```
+4. healthchecks.io will alert you if Supersidian stops running or fails
+
+### Combining with Notifications
+
+- **Healthchecks** - Monitor that Supersidian runs on schedule
+- **Notifications** - Receive details about what happened
+
+Use both for complete observability.
+
+---
+<a id="scheduling"></a>
+## ⏱ Scheduling
+
+Supersidian is designed to run repeatedly in the background to keep your vault in sync. Choose your preferred scheduling method based on your operating system.
+
+### macOS: launchd (Recommended)
+
+Create a LaunchAgent to run Supersidian automatically.
+
+**1. Copy the example plist file:**
+
+```bash
+cp macos_com.supersidian.plist.example ~/Library/LaunchAgents/com.supersidian.plist
+```
+
+**2. Edit the file to replace placeholders:**
+
+Edit `~/Library/LaunchAgents/com.supersidian.plist` and replace `/Users/YOU` with your home directory.
+
+**3. Load the LaunchAgent:**
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.supersidian.plist
+```
+
+This runs Supersidian every 10 minutes (600 seconds).
+
+> **Note:** The example file assumes supersidian is installed at `/usr/local/bin/supersidian`. If you used `pip install --user`, change the path to `~/.local/bin/supersidian`
+
+### Linux / macOS: cron
+
+Alternatively, use cron:
+
+```bash
+*/10 * * * * /usr/local/bin/supersidian >> ~/.supersidian.cron.log 2>&1
+```
+
+This runs every 10 minutes. Adjust the path to match your installation.
+
+### Windows: Task Scheduler
+
+Use Windows Task Scheduler to run `supersidian` on a schedule:
+
+1. Open Task Scheduler
+2. Create Basic Task
+3. Set trigger (e.g., every 10 minutes)
+4. Action: Start a program
+5. Program: Path to supersidian.exe (in your Python Scripts folder)
+
+### Verifying Schedule
+
+Check logs to confirm Supersidian is running:
+
+```bash
+# macOS/Linux
+tail -f ~/.supersidian.log
+
+# Or check status notes in your vault
+```
 
 ---
 <a id="license"></a>

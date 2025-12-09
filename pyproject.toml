@@ -53,7 +53,7 @@ Issues = "https://github.com/jaygoldman/supersidian/issues"
 supersidian = "supersidian.__main__:cli"
 
 [tool.setuptools]
-packages = ["supersidian", "supersidian.todo"]
+packages = ["supersidian", "supersidian.sync", "supersidian.notes", "supersidian.todo", "supersidian.notifications"]
 
 [tool.setuptools.package-data]
 supersidian = ["py.typed"]
