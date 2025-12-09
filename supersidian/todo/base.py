@@ -11,7 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from ..storage import LocalTask, TaskSyncResult
 
@@ -20,7 +20,7 @@ from ..storage import LocalTask, TaskSyncResult
 class TodoContext:
     """Context about the current bridge and vault for todo sync.
 
-    This is provided by bridge.py when calling a provider so that the
+    This is provided by supersidian.py when calling a provider so that the
     provider can, for example, add vault-specific labels or include
     note paths in external task descriptions.
     """
@@ -28,6 +28,7 @@ class TodoContext:
     bridge_name: str          # e.g. "klick"
     vault_name: str           # e.g. "Klick"
     vault_path: Path          # absolute path to the vault root
+    note_url_builder: Callable[[str], str]  # Function to build app-specific note URLs
 
 
 class BaseTodoProvider(ABC):

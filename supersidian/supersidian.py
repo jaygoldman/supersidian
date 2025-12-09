@@ -23,6 +23,7 @@ import os
 from .storage import LocalTask, TaskSyncResult, get_known_task_ids, record_task_sync_results
 from .todo import TodoContext, provider_from_env
 from .sync import SyncContext, provider_from_env as sync_provider_from_env
+from .notes import NoteContext, NoteMetadata, StatusStats, provider_from_env as note_provider_from_env
 from .__version__ import __version__
 
 import json
@@ -111,43 +112,6 @@ if VERBOSE:
 
 
 BULLET_CHARS = "•–—*-+·►"
-
-
-@lru_cache(maxsize=None)
-def load_replacements(vault_path: Path, bridge_name: str) -> dict[str, str]:
-    """Load per-vault replacements from a Markdown note in the Supersidian subfolder.
-
-    File path: <vault>/Supersidian/Replacements - <bridge>.md
-
-    File format (inside the note):
-        # comment lines start with '#'
-        - wrong -> right
-        * WrongWord -> CorrectWord
-        wrong -> right
-
-    Any leading markdown list marker is stripped before parsing."""
-    repl: dict[str, str] = {}
-    cfg_path = vault_path / "Supersidian" / f"Replacements - {bridge_name}.md"
-    if not cfg_path.exists():
-        return repl
-
-    try:
-        with cfg_path.open("r", encoding="utf-8") as f:
-            for raw in f:
-                line = raw.strip()
-                if not line or line.startswith("#"):
-                    continue
-                line = line.lstrip("-*0123456789. )").strip()
-                if "->" not in line:
-                    continue
-                wrong, right = line.split("->", 1)
-                wrong = wrong.strip()
-                right = right.strip()
-                if wrong:
-                    repl[wrong] = right
-    except Exception as e:
-        log.warning(f"Failed to load replacements from {cfg_path}: {e}")
-    return repl
 
 
 class ExtractionError(Exception):
@@ -510,79 +474,6 @@ def apply_replacements(text: str, repl: dict[str, str]) -> str:
     return pattern.sub(_sub, text)
 
 
-def write_status_note(
-    bridge: BridgeConfig,
-    notes_found: int,
-    converted: int,
-    skipped: int,
-    no_text: int,
-    tool_missing: int = 0,
-    tool_failed: int = 0,
-    supernote_missing: bool = False,
-) -> None:
-    """Write or update a status note in the Supersidian subfolder for this bridge."""
-    sup_dir = bridge.vault_path / "Supersidian"
-    status_path = sup_dir / f"Status - {bridge.name}.md"
-    sup_dir.mkdir(parents=True, exist_ok=True)
-
-    # Ensure a per-bridge Replacements note exists with example instructions.
-    repl_path = sup_dir / f"Replacements - {bridge.name}.md"
-    if not repl_path.exists():
-        repl_lines = [
-            f"# Supersidian Replacements - {bridge.name}",
-            "",
-            "# Define whole-word replacements for this vault/bridge.",
-            "# Each non-empty line should look like:",
-            "#   wrong -> right",
-            "# You can optionally prefix with '-', '*', or numbers if you prefer list syntax.",
-            "# Lines starting with '#' are treated as comments and ignored.",
-            "# Example:",
-            "# - Gaurdrail -> Guardrail",
-            "# teh -> the",
-            "",
-        ]
-        try:
-            repl_path.write_text("\n".join(repl_lines) + "\n", encoding="utf-8")
-            log.info(f"[{bridge.name}] created replacements template at {repl_path}")
-        except Exception as e:
-            log.warning(f"[{bridge.name}] failed to create replacements template at {repl_path}: {e}")
-    now = datetime.datetime.now().isoformat(timespec="seconds")
-
-    lines = [
-        f"# Supersidian Status - {bridge.name}",
-        "",
-        f"- Last run: {now}",
-        f"- Supernote path: `{bridge.supernote_path}`",
-        f"- Vault path: `{bridge.vault_path}`",
-        "",
-        "## Summary",
-        f"- Notes found: {notes_found}",
-        f"- Converted this run: {converted}",
-        f"- Skipped (up-to-date): {skipped}",
-        f"- No text extracted: {no_text}",
-    ]
-
-    errors: list[str] = []
-
-    if supernote_missing:
-        errors.append("Supernote path does not exist at last run.")
-    if tool_missing:
-        errors.append(f"supernote-tool missing for {tool_missing} note(s).")
-    if tool_failed:
-        errors.append(f"supernote-tool failed for {tool_failed} note(s).")
-    if no_text and not (tool_missing or tool_failed):
-        errors.append(f"No text extracted for {no_text} note(s).")
-
-    if errors:
-        lines.append("")
-        lines.append("## Errors")
-        for msg in errors:
-            lines.append(f"- {msg}")
-
-    status_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    log.info(f"[{bridge.name}] status updated at {status_path}")
-
-
 def send_notification(
     bridge: BridgeConfig,
     notes_found: int,
@@ -748,12 +639,7 @@ def sanitize_title(s: str) -> str:
     return s[:80] or "Untitled"
 
 
-def build_tags(default_tags: Iterable[str], extra_tags: Iterable[str]) -> str:
-    tags = list(dict.fromkeys([*default_tags, *extra_tags]))  # dedupe, keep order
-    return "[" + ", ".join(tags) + "]" if tags else "[]"
-
-
-def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
+def process_note_for_bridge(note: Path, bridge: BridgeConfig, note_provider, note_ctx: NoteContext) -> str:
     rel = note.relative_to(bridge.supernote_path)
     md_path = bridge.vault_path / rel.with_suffix(".md")
 
@@ -777,7 +663,7 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
 
     md_body = unwrap_and_markdown(txt, aggressive=getattr(bridge, "aggressive_cleanup", False))
 
-    repl = load_replacements(bridge.vault_path, bridge.name)
+    repl = note_provider.load_replacements(note_ctx)
     if repl:
         md_body = apply_replacements(md_body, repl)
 
@@ -807,6 +693,7 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
                 bridge_name=bridge.name,
                 vault_name=bridge.vault_path.name,
                 vault_path=bridge.vault_path,
+                note_url_builder=lambda path: note_provider.get_note_url(path, note_ctx),
             )
             provider = provider_from_env()
             results = provider.sync_tasks(new_open_tasks, ctx)
@@ -815,20 +702,6 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
     first = next((l for l in md_body.splitlines() if l.strip()), "")
     title_candidate = re.sub(r"^[-\*\d\.\)]+\s+", "", first).strip("# ").strip()
     title = sanitize_title(title_candidate or note.stem)
-
-    md_path.parent.mkdir(parents=True, exist_ok=True)
-
-    tags_str = build_tags(bridge.default_tags, bridge.extra_tags)
-
-    frontmatter = [
-        "---",
-        f'title: "{title}"',
-        f'date: "{datetime.datetime.now().isoformat(timespec="seconds")}"',
-        f'source_note: "{rel}"',
-        f"tags: {tags_str}",
-        "---",
-        "",
-    ]
 
     body = md_body
 
@@ -844,8 +717,21 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig) -> str:
             rel_img = img.relative_to(bridge.vault_path)
             body += f"![{img.stem}]({rel_img.as_posix()})\n"
 
-    md_path.write_text("\n".join(frontmatter) + body, encoding="utf-8")
-    log.info(f"[{bridge.name}] OK {rel} → {md_path}")
+    # Build tags list from bridge config
+    tags = list(dict.fromkeys([*bridge.default_tags, *bridge.extra_tags]))
+
+    # Create metadata for the note
+    metadata = NoteMetadata(
+        title=title,
+        tags=tags,
+        source_file=str(rel),
+        created_date=datetime.datetime.now().isoformat(timespec="seconds"),
+    )
+
+    # Use note provider to write the note
+    rel_md = rel.with_suffix(".md")
+    written_path = note_provider.write_note(body, metadata, rel_md, note_ctx)
+    log.info(f"[{bridge.name}] OK {rel} → {written_path}")
     return "converted"
 
 
@@ -861,6 +747,14 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         supernote_subdir=bridge.supernote_subdir,
     )
 
+    # Get note provider for this bridge
+    note_provider = note_provider_from_env()
+    note_ctx = NoteContext(
+        bridge_name=bridge.name,
+        vault_path=bridge.vault_path,
+        vault_name=bridge.vault_path.name,
+    )
+
     # Get the supernote root path from the sync provider
     supernote_root = sync_provider.get_root_path(sync_ctx)
 
@@ -868,8 +762,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         log.warning(f"[{bridge.name}] supernote_path does not exist: {bridge.supernote_path}")
         # Try to write a status note if the vault exists
         if bridge.vault_path.exists():
-            write_status_note(
-                bridge,
+            stats = StatusStats(
                 notes_found=0,
                 converted=0,
                 skipped=0,
@@ -878,6 +771,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
                 tool_failed=0,
                 supernote_missing=True,
             )
+            note_provider.write_status_note(stats, note_ctx)
         # Notify if configured
         if NOTIFY_MODE != "none":
             send_notification(
@@ -920,13 +814,13 @@ def process_bridge(bridge: BridgeConfig) -> bool:
     note_files = sync_provider.list_notes(sync_ctx)
     if not note_files:
         log.info(f"[{bridge.name}] no .note files under {supernote_root}")
-        write_status_note(
-            bridge,
+        stats = StatusStats(
             notes_found=0,
             converted=0,
             skipped=0,
             no_text=0,
         )
+        note_provider.write_status_note(stats, note_ctx)
         return False
 
     converted = 0
@@ -936,7 +830,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
     tool_failed = 0
 
     for note_file in note_files:
-        status = process_note_for_bridge(note_file.path, bridge)
+        status = process_note_for_bridge(note_file.path, bridge, note_provider, note_ctx)
         if status == "converted":
             converted += 1
         elif status == "skipped_up_to_date":
@@ -948,8 +842,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         elif status == "tool_failed":
             tool_failed += 1
 
-    write_status_note(
-        bridge,
+    stats = StatusStats(
         notes_found=len(note_files),
         converted=converted,
         skipped=skipped,
@@ -958,6 +851,7 @@ def process_bridge(bridge: BridgeConfig) -> bool:
         tool_failed=tool_failed,
         supernote_missing=False,
     )
+    note_provider.write_status_note(stats, note_ctx)
 
     # For error signaling (notifications + healthchecks), only treat structural
     # issues as errors: missing tool, tool failures, or missing paths.

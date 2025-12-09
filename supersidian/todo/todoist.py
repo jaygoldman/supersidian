@@ -46,32 +46,23 @@ class TodoistProvider(BaseTodoProvider):
             .rstrip("/")
         )
 
-    def _build_obsidian_url(self, task: LocalTask, ctx: TodoContext) -> str:
-        """Build an obsidian:// URL that opens the originating note.
+    def _build_note_url(self, task: LocalTask, ctx: TodoContext) -> str:
+        """Build a note app URL that opens the originating note.
 
-        Uses the vault name (assumed to match the Obsidian vault name) and
-        the note path relative to the vault. The `.md` suffix is stripped
-        and the path is URL-encoded so that spaces and subfolders work.
+        Uses the note_url_builder from the context, which is provided
+        by the note provider (Obsidian, markdown, etc.).
         """
-
-        vault_name = ctx.vault_name
         note_path = task.note_path
 
         # Strip trailing .md if present
         if note_path.lower().endswith(".md"):
             note_path = note_path[:-3]
 
-        # Example result:
-        #   obsidian://open?vault=Personal&file=Todo%20test%2020251207_124014
-        # or, with folders:
-        #   obsidian://open?vault=Klick&file=Guardrail%2FIntake%2FNote%20Name
-        vault_param = quote(vault_name, safe="")
-        file_param = quote(note_path, safe="")  # encode / as %2F and spaces as %20
-
-        return f"obsidian://open?vault={vault_param}&file={file_param}"
+        # Use the note provider's URL builder
+        return ctx.note_url_builder(note_path)
 
     def _build_description(self, task: LocalTask, ctx: TodoContext) -> str:
-        obsidian_url = self._build_obsidian_url(task, ctx)
+        note_url = self._build_note_url(task, ctx)
         lines = [
             "From Supersidian",
             "",
@@ -80,7 +71,7 @@ class TodoistProvider(BaseTodoProvider):
             f"Line: {task.line_no}",
             f"Local ID: {task.local_id}",
             "",
-            f"Obsidian: {obsidian_url}",
+            f"Note URL: {note_url}",
         ]
         return "\n".join(lines)
 
