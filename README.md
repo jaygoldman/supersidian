@@ -1,17 +1,16 @@
 # Supersidian
 
-Supersidian is a fully automated pipeline that transforms **Supernote Real-Time Recognition notes** into clean, structured **Markdown** inside **Obsidian**, preserving your notebook hierarchy, applying intelligent formatting fixes, and correcting common recognition errors.
+> *Write naturally on your Supernote. Get beautifully formatted, instantly searchable notes in Obsidian and todos in your task app of choice automatically.*
 
-The goal is simple:
+Supersidian is a fully automated pipeline that transforms **Supernote Real-Time Recognition notes** into clean, structured **Markdown** inside **Obsidian**, preserving your notebook hierarchy, applying intelligent formatting fixes, and correcting common recognition errors. Supersidian also identifies tasks in your notes and syncs them to your **Obsidian** vault and, optionally, your todo app of choice. 
 
-> *Write naturally on your Supernote. Get beautifully formatted, instantly searchable notes in Obsidian — automatically.*
-
-Supersidian watches your Supernote-synced Dropbox folder, extracts recognized text using `supernote-tool`, cleans it up, fixes headings and indentation, applies custom corrections you maintain inside Obsidian, and writes Markdown files into your Obsidian vault.
+Supersidian watches your Supernote-synced Dropbox folder, extracts recognized text using [supernote-tool](https://github.com/jya-dev/supernote-tool), cleans it up, fixes headings and indentation, applies custom corrections you maintain inside Obsidian, and writes Markdown files into your Obsidian vault and tasks into your todo app of choice.
 
 ## Table of Contents
 
 - [What problem does Supersidian solve?](#what-problem-does-supersidian-solve)
 - [How Supersidian works](#how-supersidian-works)
+- [Tasks](#tasks)
 - [Requirements](#requirements)
 - [Logging](#logging)
 - [Configuration](#configuration)
@@ -37,21 +36,20 @@ Supernote’s handwriting recognition is excellent, but the workflow around it h
 
 Supersidian automates the entire pipeline:
 
-1. **Extract text** directly from `.note` files using `supernote-tool`.
+1. **Extract text** directly from `.note` files using [supernote-tool](https://github.com/jya-dev/supernote-tool).
 2. **Clean up the output** — unwrap lines, fix bullets, split inline headings, normalize spacing.
 3. **Support nested bullets** using a simple Supernote-friendly syntax (`-`, `--`, `---`).
 4. **Apply your custom word corrections** using a Markdown file *inside* your Obsidian vault.
 5. **Write Markdown files** to the correct subfolders in the vault.
 6. **Skip unchanged notes** using timestamp comparison.
-
-It’s a “write once, sync forever” system.
+7. **Sync your tasks** from inside Supernotes to Obsidian and your todo app of choice.
 
 ---
 <a id="how-supersidian-works"></a>
 ## 🧩 How Supersidian works
 
 ### 1. You write in Supernote
-Using **Real-Time Recognition** notes, optionally with structured bullets:
+Using **Real-Time Recognition** notes, optionally in Markdown format with structured bullets:
 
 ```
 - Top bullet
@@ -60,14 +58,14 @@ Using **Real-Time Recognition** notes, optionally with structured bullets:
 ```
 
 ### 2. Supernote syncs notes into Dropbox
-Your device must be configured to sync to:
+Your device must be configured to sync to Dropbox, which is currently the only support sync service (add an [Issue](https://github.com/jaygoldman/supersidian/issues) to request a new service). You can configure your Dropbox location in your .env file (see [Configuration](#configuration)). Typically, your notes will be in this location:
 
 ```
 Dropbox/Supernote/Note/<YourFolderStructure>
 ```
 
 ### 3. Supersidian processes only updated `.note` files
-It compares modified timestamps and skips notes that haven’t changed.
+It compares modified timestamps and skips notes that haven’t changed relative to their Obsidian counterparts.
 
 ### 4. Text extraction via supernote-tool
 Supersidian shells out to the tool:
@@ -86,10 +84,13 @@ Supersidian:
 - splits inline headings (e.g., `some text ##Heading` → two lines)
 - normalizes heading spacing (e.g. `##Title` → `## Title`)
 - converts `-, --, ---` into nested Markdown indentation
+- capitalizes the first letter of each separated line
 - converts `[ ] task` and `[x] task` lines into proper Obsidian tasks (`- [ ] Task`, `- [x] Task`)
 
-### Task Conversion
-Supersidian now detects Supernote lines starting with `[ ]` or `[x]` and transforms them into Obsidian tasks:
+---
+<a id="tasks"></a>
+## Tasks
+Supersidian detects Supernote lines starting with `[ ]` or `[x]` and transforms them into Obsidian tasks:
 ```
 [ ] follow up with client
 [x] send agenda
@@ -103,8 +104,8 @@ becomes:
 This works alongside nested bullets and aggressive cleanup.
 ```
 
-### 📝 Task Extraction & Todoist Sync
-Supersidian automatically detects Supernote checkbox lines (`[ ]` and `[x]`) and converts them into Obsidian tasks. In addition, tasks now participate in a full task‑sync pipeline:
+### 📝 Task Extraction and Todo App Sync
+Supersidian can sync your tasks into your todo app of choice:
 
 #### ✔ Local Task Registry (SQLite)
 Every detected task is assigned a stable local ID and stored in a lightweight local SQLite database. This enables:
@@ -112,9 +113,9 @@ Every detected task is assigned a stable local ID and stored in a lightweight lo
 - preventing duplicate syncs
 - future integration with multiple providers
 
-#### ✔ Only Open Tasks Sync to Todoist
-Supersidian syncs **only unchecked tasks** (`[ ]`) to Todoist.
-Completed tasks (`[x]`) are **ignored** for sync purposes and stored locally only. This keeps your Todoist inbox clean and prevents noise.
+#### ✔ Only Open Tasks Sync to other apps
+Supersidian syncs **only unchecked tasks** (`[ ]`) to your todo app.
+Completed tasks (`[x]`) are **ignored** for sync purposes and stored locally only. This keeps your todo inbox clean and prevents noise.
 
 #### ✔ Todoist Integration
 If you set:
@@ -129,6 +130,9 @@ Each created Todoist task includes:
 - a description containing vault, note path, line number, and local task ID
 
 If no provider is configured, or Todoist is unavailable, Supersidian falls back to a safe no‑op provider and marks tasks as "skipped" without raising errors.
+
+##### Todoist API Tokens
+Instructions on [finding your Todoist API Token](https://www.todoist.com/help/articles/find-your-api-token-Jpzx9IIlB) are in their support docs.
 
 #### ✔ Idempotent Sync
 Each task is synced only once. Supersidian never resends a task that has already been assigned a Todoist ID.
@@ -200,13 +204,13 @@ Because Supersidian handles idempotency and local history, providers can remain 
 
 ---
 ### 6. Custom word corrections
-Inside your vault, create: 
+Supersidian will automatically create a Supersidian folder inside your vault, including a special file:
 
 ```
 Supersidian Replacements.md
 ```
 
-Add corrections:
+That file will include a comment with the format for your replacement dictionary explained. You can add corrections:
 
 ```
 - Supersidain -> Supersidian
@@ -220,8 +224,8 @@ Supersidian applies these **after** formatting. It uses whole-word replacement t
 Supersidian mirrors your Supernote folder structure:
 
 ```
-Supernote/Note/Klick/Guardrail/Foo.note
-→ Obsidian/Klick/Guardrail/Foo.md
+Supernote/Note/Acme/Products/Foo.note
+→ Obsidian/Acme/Products/Foo.md
 ```
 
 ---
@@ -240,7 +244,7 @@ Dropbox/Supernote/Note/
 ```
 
 ### Dropbox (macOS, Windows, Linux)
-Supersidian does **not** require macOS. It can run on any OS where Dropbox syncs note files locally. This includes:
+Supersidian can run on any OS where Dropbox syncs note files locally. This includes:
 - macOS (native Dropbox client)
 - Windows (native Dropbox client)
 - Linux (official and community-supported Dropbox clients)
@@ -256,17 +260,8 @@ You can sync your vault using:
 Your vault path must be accessible to Supersidian, e.g.:
 
 ```
-~/Obsidian/Klick
+~/Obsidian/Acme
 ```
-
-### supernote-tool
-Install via pip:
-
-```
-pip install supernotelib
-```
-
-Make sure `supernote-tool` is available on your PATH.
 
 ### Python
 - Python 3.10+
@@ -277,6 +272,16 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+### supernote-tool
+Install via pip:
+
+```
+pip install supernotelib
+```
+
+Make sure `supernote-tool` is available on your PATH. More information in the [supernote-tool documentation](https://github.com/jya-dev/supernote-tool)
+
 
 ---
 <a id="logging"></a>
@@ -352,13 +357,13 @@ Defines one or more “bridges” mapping Supernote folders to Obsidian vaults:
 {
   "bridges": [
     {
-      "name": "klick",
+      "name": "acme",
       "enabled": true,
-      "supernote_subdir": "Klick",
-      "vault_path": "/Users/you/Obsidian/Klick",
+      "supernote_subdir": "Acme",
+      "vault_path": "/Users/you/Obsidian/Acme",
       "aggressive_cleanup": true,
       "spellcheck": false,
-      "extra_tags": ["klick"]
+      "extra_tags": ["acme"]
     }
   ]
 }
@@ -502,7 +507,7 @@ Supersidian mirrors whatever folder structure you maintain on your Supernote dev
 If your Supernote contains:
 
 ```
-Klick/
+Acme/
   Guardrail/
     Intake/
     Playbooks/
@@ -511,7 +516,7 @@ Klick/
 Your Obsidian vault will contain:
 
 ```
-Klick/
+Acme/
   Guardrail/
     Intake/
     Playbooks/
@@ -555,10 +560,10 @@ On every run, Supersidian generates a status report *inside your Obsidian vault*
 Supersidian Status - <bridge name>.md
 ```
 
-For example, for a bridge named `klick`:
+For example, for a bridge named `acme`:
 
 ```
-Obsidian/Klick/Supersidian Status - klick.md
+Obsidian/Acme/Supersidian Status - acme.md
 ```
 
 ### What the status note contains
@@ -575,11 +580,11 @@ Each run overwrites the status note with an updated summary:
 Example:
 
 ```
-# Supersidian Status - klick
+# Supersidian Status - acme
 
 - Last run: 2025‑12‑01T22:34:56
-- Supernote path: `/Users/.../Dropbox/Supernote/Note/Klick`
-- Vault path: `/Users/.../Obsidian/Klick`
+- Supernote path: `/Users/.../Dropbox/Supernote/Note/Acme`
+- Vault path: `/Users/.../Obsidian/Acme`
 
 ## Summary
 - Notes found: 23
@@ -647,7 +652,7 @@ Supersidian sends a POST request with the following structure:
 
 ```json
 {
-  "bridge": "klick",
+  "bridge": "acme",
   "timestamp": "2025-12-01T22:34:56",
   "notes_found": 23,
   "converted": 2,
@@ -681,7 +686,7 @@ curl -s https://ntfy.sh/supersidian-alerts/json
 You will receive real‑time alerts like:
 
 ```
-{"bridge":"klick","converted":2,"no_text":1,"tool_failed":1,"timestamp":"2025‑12‑01T22:34:56"}
+{"bridge":"acme","converted":2,"no_text":1,"tool_failed":1,"timestamp":"2025‑12‑01T22:34:56"}
 ```
 
 ### Example: Local Script Trigger
