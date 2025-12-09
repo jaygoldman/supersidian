@@ -580,14 +580,12 @@ def send_notification(
     # Human-readable vault label comes from the vault folder name
     vault_name = bridge.vault_path.name
 
-    # Build a multi-line, ntfy-friendly message
-    lines = [
+    # Build a multi-line, ntfy-friendly message. Errors are shown first so they
+    # are immediately visible in push notifications, followed by the run
+    # breakdown.
+    lines: list[str] = [
         f"Supersidian: {vault_name} - [{outcome}]",
         "",
-        f"Notes: {notes_found}",
-        f"Converted: {converted}",
-        f"Skipped: {skipped}",
-        f"No text: {no_text}",
     ]
 
     errors: list[str] = []
@@ -601,13 +599,23 @@ def send_notification(
         errors.append("Obsidian vault is missing")
 
     if errors:
-        lines.append("")
         if len(errors) == 1:
             lines.append(f"Error: {errors[0]}")
         else:
             lines.append("Errors:")
             for e in errors:
                 lines.append(f"- {e}")
+        lines.append("")
+
+    # Append the run breakdown after any error section
+    lines.extend(
+        [
+            f"Notes: {notes_found}",
+            f"Converted: {converted}",
+            f"Skipped: {skipped}",
+            f"No text: {no_text}",
+        ]
+    )
 
     message = "\n".join(lines)
 
