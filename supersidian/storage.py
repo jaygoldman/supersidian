@@ -139,6 +139,47 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         """
     )
 
+    # Bridge status table: current sync status for each bridge
+    # Used by macOS menubar app to display real-time status
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bridge_status (
+            bridge_name         TEXT PRIMARY KEY,
+            last_sync_time      TEXT NOT NULL,
+            status              TEXT NOT NULL,
+            notes_found         INTEGER DEFAULT 0,
+            converted           INTEGER DEFAULT 0,
+            skipped             INTEGER DEFAULT 0,
+            no_text             INTEGER DEFAULT 0,
+            tasks_total         INTEGER DEFAULT 0,
+            tasks_open          INTEGER DEFAULT 0,
+            tasks_completed     INTEGER DEFAULT 0,
+            error_message       TEXT,
+            tool_missing        INTEGER DEFAULT 0,
+            tool_failed         INTEGER DEFAULT 0,
+            supernote_missing   INTEGER DEFAULT 0,
+            vault_missing       INTEGER DEFAULT 0
+        ) WITHOUT ROWID
+        """
+    )
+
+    # Sync history table: historical data for charts and trends
+    # Used by macOS menubar app preferences window
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sync_history (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            bridge_name         TEXT NOT NULL,
+            sync_time           TEXT NOT NULL,
+            duration_seconds    REAL,
+            notes_converted     INTEGER DEFAULT 0,
+            notes_skipped       INTEGER DEFAULT 0,
+            tasks_synced        INTEGER DEFAULT 0,
+            success             INTEGER DEFAULT 1
+        )
+        """
+    )
+
     conn.commit()
 
 

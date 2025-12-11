@@ -8,6 +8,8 @@ from functools import lru_cache
 
 import time
 import argparse
+import urllib.request
+import urllib.error
 
 from unidecode import unidecode
 
@@ -120,15 +122,35 @@ class ExtractionError(Exception):
 
 
 # Helper to run supernote-tool with retries for transient Dropbox/CloudStorage errors
-def run_supernote_tool(args: list[str], retries: int = 2, delay: float = 0.5) -> subprocess.CompletedProcess[str]:
-    """Run supernote-tool with a small retry loop for transient errors.
+def run_supernote_tool(args: list[str], retries: int = 4, initial_delay: float = 1.0) -> subprocess.CompletedProcess[str]:
+    """Run supernote-tool with exponential backoff retry for transient errors.
 
     In particular, we retry on cases where the underlying filesystem reports
     a temporary deadlock (e.g. Dropbox/CloudStorage race conditions) which
     surface in supernote-tool's stderr as "Resource deadlock avoided" or
     "[Errno 11]". Other failures are propagated immediately.
+
+    Uses exponential backoff: 1s, 2s, 4s, 8s for better handling of
+    cloud storage sync delays.
+
+    For convert operations, if all retries fail with EDEADLK, attempts to
+    copy the input file to a temporary location and retry the operation
+    there to work around CloudStorage filesystem issues.
+
+    Args:
+        args: Command line arguments for supernote-tool
+        retries: Number of retry attempts (default: 4, for 5 total attempts)
+        initial_delay: Initial delay in seconds (default: 1.0, doubles each retry)
+
+    Returns:
+        CompletedProcess from successful run
+
+    Raises:
+        CalledProcessError: If all retries exhausted or non-transient error
     """
     last_err: subprocess.CalledProcessError | None = None
+    is_convert_cmd = len(args) > 1 and args[1] == "convert"
+    input_file = Path(args[2]) if is_convert_cmd and len(args) > 2 else None
 
     for attempt in range(retries + 1):
         try:
@@ -137,14 +159,18 @@ def run_supernote_tool(args: list[str], retries: int = 2, delay: float = 0.5) ->
                 capture_output=True,
                 text=True,
                 check=True,
+                close_fds=True,  # Prevent file descriptor inheritance issues with CloudStorage
             )
         except subprocess.CalledProcessError as e:
             last_err = e
             msg = (e.stderr or "").strip() or (e.stdout or "").strip() or str(e)
             if ("Resource deadlock avoided" in msg or "[Errno 11]" in msg) and attempt < retries:
+                # Exponential backoff: 1s, 2s, 4s, 8s
+                delay = initial_delay * (2 ** attempt)
                 if VERBOSE:
                     log.warning(
-                        f"supernote-tool transient EDEADLK (attempt {attempt + 1}/{retries}), retrying..."
+                        f"supernote-tool transient EDEADLK (attempt {attempt + 1}/{retries}), "
+                        f"retrying in {delay:.1f}s..."
                     )
                 time.sleep(delay)
                 continue
@@ -210,10 +236,13 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
 
     raw = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     out: list[str] = []
+    last_heading_index = -10  # Track the last heading we saw
 
     for i, line in enumerate(raw):
         if i == 0:
             out.append(line)
+            if heading_start.match(line):
+                last_heading_index = 0
             continue
 
         prev = out[-1]
@@ -230,8 +259,22 @@ def unwrap_and_markdown(text: str, aggressive: bool = False) -> str:
 
         prev_hard = prev_blank or prev.endswith("  ")
         prev_hyphen = bool(re.search(r"[^\s-]-$", prev))
+        prev_heading = bool(heading_start.match(prev))
 
-        if not prev_hard and not curr_new_block:
+        # Update heading tracker
+        if heading_start.match(line):
+            last_heading_index = len(out)
+
+        # Detect if current line looks like a list item (starts with capital letter)
+        # This helps when OCR misses checkbox markers
+        curr_looks_like_item = line and line.lstrip() and line.lstrip()[0].isupper()
+
+        # Within 5 lines after a heading, preserve line breaks (likely list items)
+        lines_since_heading = len(out) - last_heading_index
+        near_heading = lines_since_heading <= 5
+
+        # Don't merge lines after headings, near headings, or lines that look like new items
+        if not prev_hard and not curr_new_block and not prev_heading and not curr_looks_like_item and not near_heading:
             if prev_hyphen:
                 out[-1] = prev[:-1] + line.lstrip()
             else:
@@ -484,9 +527,10 @@ def send_notifications(
     tool_failed: int,
     supernote_missing: bool,
     vault_missing: bool,
+    always_send: bool = False,
 ) -> None:
     """Send notifications to all configured providers.
-    
+
     Args:
         providers: List of notification providers to use
         bridge: Bridge configuration
@@ -498,6 +542,7 @@ def send_notifications(
         tool_failed: Number of notes where supernote-tool failed
         supernote_missing: Whether the supernote path is missing
         vault_missing: Whether the vault path is missing
+        always_send: If True, send to all providers (e.g., for menubar updates)
     """
     if not providers:
         return
@@ -523,15 +568,21 @@ def send_notifications(
     )
 
     # Send to all configured providers
+    # Menubar provider (name="menubar") is always sent to, regardless of NOTIFY_MODE
     ctx = NotificationContext(bridge_name=bridge.name)
     for provider in providers:
-        try:
-            provider.send(payload, ctx)
-        except Exception as e:
-            # Providers should never raise, but catch just in case
-            log.warning(
-                f"[{bridge.name}] notification provider {provider.name} raised exception: {e}"
-            )
+        # Always send to menubar provider (it's a state tracker, not a notification)
+        # For other providers, respect the always_send flag
+        should_send = always_send or provider.name == "menubar"
+
+        if should_send:
+            try:
+                provider.send(payload, ctx)
+            except Exception as e:
+                # Providers should never raise, but catch just in case
+                log.warning(
+                    f"[{bridge.name}] notification provider {provider.name} raised exception: {e}"
+                )
 
 
 def export_images(note_path: Path, bridge: BridgeConfig) -> list[Path]:
@@ -604,6 +655,20 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig, note_provider, not
     rel = note.relative_to(bridge.supernote_path)
     md_path = bridge.vault_path / rel.with_suffix(".md")
 
+    # Skip files modified in the last 20 minutes to avoid Dropbox/iCloud locking issues
+    # These files will be picked up on the next run once cloud storage sync completes
+    # Note: Dropbox can take 15+ minutes to fully sync large files in the background
+    file_age_seconds = time.time() - note.stat().st_mtime
+    min_age_seconds = int(os.environ.get("SUPERSIDIAN_MIN_FILE_AGE_SECONDS", "1200"))  # Default: 20 minutes
+
+    if file_age_seconds < min_age_seconds:
+        age_mins = file_age_seconds / 60
+        if VERBOSE:
+            log.debug(
+                f"[{bridge.name}] skipping {rel} (age {age_mins:.1f}m < {min_age_seconds/60:.0f}m threshold)"
+            )
+        return "skipped_too_recent"
+
     if md_path.exists() and md_path.stat().st_mtime >= note.stat().st_mtime:
         return "skipped_up_to_date"
 
@@ -674,9 +739,8 @@ def process_note_for_bridge(note: Path, bridge: BridgeConfig, note_provider, not
     if image_paths:
         body += "\n\n## Sketches\n\n"
         for img in image_paths:
-            # Make path relative to vault root for Markdown linking
-            rel_img = img.relative_to(bridge.vault_path)
-            body += f"![{img.stem}]({rel_img.as_posix()})\n"
+            # Use Obsidian wikilink syntax for images - finds images anywhere in vault
+            body += f"![[{img.name}]]\n"
 
     # Build tags list from bridge config
     tags = list(dict.fromkeys([*bridge.default_tags, *bridge.extra_tags]))
@@ -733,44 +797,41 @@ def process_bridge(bridge: BridgeConfig, notification_providers: list) -> bool:
                 supernote_missing=True,
             )
             note_provider.write_status_note(stats, note_ctx)
-        # Notify if configured
-        if NOTIFY_MODE != "none":
-            send_notifications(
-                notification_providers,
-                bridge,
-                notes_found=0,
-                converted=0,
-                skipped=0,
-                no_text=0,
-                tool_missing=0,
-                tool_failed=0,
-                supernote_missing=True,
-                vault_missing=not bridge.vault_path.exists(),
-            )
-        else:
-            if VERBOSE:
-                log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (supernote missing)")
+        # Send notifications (menubar provider always receives, others based on NOTIFY_MODE)
+        should_notify_all = NOTIFY_MODE != "none"
+        send_notifications(
+            notification_providers,
+            bridge,
+            notes_found=0,
+            converted=0,
+            skipped=0,
+            no_text=0,
+            tool_missing=0,
+            tool_failed=0,
+            supernote_missing=True,
+            vault_missing=not bridge.vault_path.exists(),
+            always_send=should_notify_all,
+        )
         return True
 
     if not bridge.vault_path.exists():
         log.warning(f"[{bridge.name}] vault_path does not exist: {bridge.vault_path}")
         # Cannot write a status note without a vault, but can still notify
-        if NOTIFY_MODE != "none":
-            send_notifications(
-                notification_providers,
-                bridge,
-                notes_found=0,
-                converted=0,
-                skipped=0,
-                no_text=0,
-                tool_missing=0,
-                tool_failed=0,
-                supernote_missing=False,
-                vault_missing=True,
-            )
-        else:
-            if VERBOSE:
-                log.debug(f"[{bridge.name}] notification suppressed by NOTIFY_MODE='none' (vault missing)")
+        # (menubar provider always receives, others based on NOTIFY_MODE)
+        should_notify_all = NOTIFY_MODE != "none"
+        send_notifications(
+            notification_providers,
+            bridge,
+            notes_found=0,
+            converted=0,
+            skipped=0,
+            no_text=0,
+            tool_missing=0,
+            tool_failed=0,
+            supernote_missing=False,
+            vault_missing=True,
+            always_send=should_notify_all,
+        )
         return True
 
     # Use sync provider to discover notes
@@ -798,6 +859,10 @@ def process_bridge(bridge: BridgeConfig, notification_providers: list) -> bool:
             converted += 1
         elif status == "skipped_up_to_date":
             skipped += 1
+        elif status == "skipped_too_recent":
+            # Don't count as skipped in stats - file will be processed on next run
+            # This prevents "recently synced" files from inflating skip counts
+            pass
         elif status == "no_text":
             no_text += 1
         elif status == "tool_missing":
@@ -821,27 +886,92 @@ def process_bridge(bridge: BridgeConfig, notification_providers: list) -> bool:
     # Notes with no recognized text are reported in the status/notification
     # summary but do not, by themselves, mark the run as failed.
     errorish = bool(tool_missing or tool_failed)
-    if NOTIFY_MODE == "all" or (NOTIFY_MODE == "errors" and errorish):
-        send_notifications(
-            notification_providers,
-            bridge,
-            notes_found=len(note_files),
-            converted=converted,
-            skipped=skipped,
-            no_text=no_text,
-            tool_missing=tool_missing,
-            tool_failed=tool_failed,
-            supernote_missing=False,
-            vault_missing=False,
-        )
-    else:
-        if VERBOSE:
-            log.debug(
-                f"[{bridge.name}] notification suppressed by NOTIFY_MODE='{NOTIFY_MODE}' "
-                f"(errorish={errorish})"
-            )
+
+    # Send notifications (menubar provider always receives updates)
+    # Other providers only receive based on NOTIFY_MODE
+    should_notify_all = NOTIFY_MODE == "all" or (NOTIFY_MODE == "errors" and errorish)
+    send_notifications(
+        notification_providers,
+        bridge,
+        notes_found=len(note_files),
+        converted=converted,
+        skipped=skipped,
+        no_text=no_text,
+        tool_missing=tool_missing,
+        tool_failed=tool_failed,
+        supernote_missing=False,
+        vault_missing=False,
+        always_send=should_notify_all,
+    )
 
     return errorish
+
+
+def export_status_json() -> dict:
+    """Export complete system configuration and status for the menubar app.
+
+    Returns a dictionary containing:
+    - bridges: List of bridge configurations with current status
+    - database_path: Path to the SQLite database
+    - log_path: Path to the log file
+    - providers: Configured notification/sync/todo providers
+    """
+    import json
+    from .storage import _get_connection, DB_PATH
+
+    cfg = load_config()
+    conn = _get_connection()
+    cur = conn.cursor()
+
+    # Get all bridge status from database
+    cur.execute("SELECT * FROM bridge_status")
+    status_rows = {row["bridge_name"]: dict(row) for row in cur.fetchall()}
+
+    # Build bridge list with config + status
+    bridges = []
+    for bridge in cfg.bridges:
+        bridge_data = {
+            "name": bridge.name,
+            "enabled": bridge.enabled,
+            "supernote_path": str(bridge.supernote_path),
+            "vault_path": str(bridge.vault_path),
+            "vault_name": bridge.vault_path.name,
+            "default_tags": bridge.default_tags,
+            "extra_tags": bridge.extra_tags,
+            "aggressive_cleanup": bridge.aggressive_cleanup,
+            "spellcheck": bridge.spellcheck,
+            "export_images": bridge.export_images,
+            "images_subdir": bridge.images_subdir,
+        }
+
+        # Merge status if available
+        if bridge.name in status_rows:
+            bridge_data["status"] = status_rows[bridge.name]
+
+        bridges.append(bridge_data)
+
+    # Get provider info from environment
+    notification_providers = notification_providers_from_env()
+    provider_names = [p.name for p in notification_providers]
+
+    return {
+        "version": __version__,
+        "bridges": bridges,
+        "database_path": str(DB_PATH),
+        "log_path": str(LOG_PATH),
+        "supernote_root": str(cfg.supernote_root),
+        "providers": {
+            "notification": provider_names,
+            "sync": os.environ.get("SUPERSIDIAN_SYNC_PROVIDER", "local"),
+            "todo": os.environ.get("SUPERSIDIAN_TODO_PROVIDER", "noop"),
+            "notes": os.environ.get("SUPERSIDIAN_NOTE_PROVIDER", "obsidian"),
+        },
+        "settings": {
+            "verbose": VERBOSE,
+            "notify_mode": NOTIFY_MODE,
+            "supernote_tool": SUPERNOTE_TOOL,
+        },
+    }
 
 
 def main() -> None:
@@ -861,11 +991,23 @@ def main() -> None:
         action="store_true",
         help="Enable verbose logging output",
     )
+    parser.add_argument(
+        "--export-status",
+        action="store_true",
+        help="Export complete system configuration as JSON (for menubar app)",
+    )
     args = parser.parse_args()
 
     # Override VERBOSE if --verbose flag is passed
     if args.verbose:
         VERBOSE = True
+
+    # Handle --export-status command
+    if args.export_status:
+        import json
+        status = export_status_json()
+        print(json.dumps(status, indent=2))
+        return
 
     cfg = load_config()
 

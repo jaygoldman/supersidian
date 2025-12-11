@@ -27,6 +27,12 @@ try:
 except Exception:
     WebhookProvider = None  # type: ignore
 
+# Optional: Menubar provider (macOS only)
+try:
+    from .menubar import MenubarProvider
+except Exception:
+    MenubarProvider = None  # type: ignore
+
 
 _PROVIDER_FACTORIES: Dict[str, Callable[[], BaseNotificationProvider]] = {}
 
@@ -46,6 +52,10 @@ def _register_defaults() -> None:
     # Webhook provider
     if WebhookProvider is not None:
         _PROVIDER_FACTORIES["webhook"] = lambda: WebhookProvider()
+
+    # Menubar provider (macOS only)
+    if MenubarProvider is not None:
+        _PROVIDER_FACTORIES["menubar"] = lambda: MenubarProvider()
 
 
 def get_provider(name: Optional[str]) -> BaseNotificationProvider:
