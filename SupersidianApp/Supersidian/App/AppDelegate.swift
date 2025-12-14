@@ -23,6 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var currentState: MenubarState = .idle
     private var bridges: [BridgeStatus] = []
     private var syncWindow: NSWindow?
+    private var preferencesWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon - menubar only app
@@ -281,8 +282,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openPreferences() {
-        // Will implement preferences window in Phase 5
-        NSLog("Open preferences - not yet implemented")
+        // Show existing window if already open
+        if let window = preferencesWindow {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        
+        // Create preferences window
+        let prefsView = PreferencesWindow()
+        let hostingController = NSHostingController(rootView: prefsView)
+        
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Supersidian Preferences"
+        window.contentViewController = hostingController
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 700, height: 500)
+        
+        // Handle window close
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.preferencesWindow = nil
+        }
+        
+        preferencesWindow = window
+        window.makeKeyAndOrderFront(nil)
     }
 
     @objc private func openAbout() {

@@ -164,7 +164,7 @@ struct SupersidianConfig: Codable {
     var bridges: [BridgeConfig]
 }
 
-struct BridgeConfig: Codable, Identifiable {
+struct BridgeConfig: Codable, Identifiable, Equatable, Hashable {
     var name: String
     var enabled: Bool
     var supernoteSubdir: String
@@ -194,8 +194,85 @@ struct BridgeConfig: Codable, Identifiable {
     }
 }
 
-enum ConfigurationError: Error {
+enum ConfigurationError: LocalizedError {
     case projectNotFound
     case invalidConfiguration
     case backupFailed
+    
+    // Validation errors
+    case missingSupernoteRoot
+    case supernoteRootNotFound(String)
+    case noBridges
+    case invalidBridgeName
+    case missingSupernoteSubdir(String)
+    case missingVaultPath(String)
+    case vaultPathNotFound(String, String)
+    case missingTodoistToken
+    case missingWebhookUrl
+    
+    var errorDescription: String? {
+        switch self {
+        case .projectNotFound:
+            return "Project configuration not found"
+        case .invalidConfiguration:
+            return "Invalid configuration"
+        case .backupFailed:
+            return "Failed to create configuration backup"
+        case .missingSupernoteRoot:
+            return "Supernote root path is required"
+        case .supernoteRootNotFound(let path):
+            return "Supernote root not found: \(path)"
+        case .noBridges:
+            return "At least one vault must be configured"
+        case .invalidBridgeName:
+            return "Bridge name cannot be empty"
+        case .missingSupernoteSubdir(let name):
+            return "Supernote subdirectory is required for bridge '\(name)'"
+        case .missingVaultPath(let name):
+            return "Vault path is required for bridge '\(name)'"
+        case .vaultPathNotFound(let name, let path):
+            return "Vault path not found for bridge '\(name)': \(path)"
+        case .missingTodoistToken:
+            return "Todoist API token is required when Todoist provider is enabled"
+        case .missingWebhookUrl:
+            return "Webhook URL is required when webhook notifications are enabled"
+        }
+    }
+}
+
+// MARK: - BridgeConfig Extensions
+
+extension BridgeConfig {
+    func validate() throws {
+        guard !name.isEmpty else {
+            throw ConfigurationError.invalidBridgeName
+        }
+        
+        guard !supernoteSubdir.isEmpty else {
+            throw ConfigurationError.missingSupernoteSubdir(name)
+        }
+        
+        guard !vaultPath.isEmpty else {
+            throw ConfigurationError.missingVaultPath(name)
+        }
+        
+        let vaultURL = URL(fileURLWithPath: (vaultPath as NSString).expandingTildeInPath)
+        guard FileManager.default.fileExists(atPath: vaultURL.path) else {
+            throw ConfigurationError.vaultPathNotFound(name, vaultPath)
+        }
+    }
+    
+    func toJSON() -> AppConfiguration.BridgeJSON {
+        AppConfiguration.BridgeJSON(
+            name: name,
+            enabled: enabled,
+            supernoteSubdir: supernoteSubdir,
+            vaultPath: vaultPath,
+            extraTags: extraTags,
+            aggressiveCleanup: aggressiveCleanup,
+            spellcheck: spellcheck,
+            exportImages: exportImages,
+            imagesSubdir: imagesSubdir
+        )
+    }
 }

@@ -9,6 +9,14 @@
 /* Begin PBXBuildFile section */
 		9DC1841D2EEE76E200B78980 /* SyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1841C2EEE76E200B78980 /* SyncCoordinator.swift */; };
 		9DC1841F2EEE772700B78980 /* SyncProgressWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1841E2EEE772700B78980 /* SyncProgressWindow.swift */; };
+		9DC184212EEE7AFB00B78980 /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC184202EEE7AFB00B78980 /* AppConfiguration.swift */; };
+		9DC184272EEE7DDF00B78980 /* PreferencesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC184242EEE7DDF00B78980 /* PreferencesViewModel.swift */; };
+		9DC184282EEE7DDF00B78980 /* SyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC184252EEE7DDF00B78980 /* SyncCoordinator.swift */; };
+		9DC184322EEE7E1D00B78980 /* AdditionalPreferencesViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC184292EEE7E1D00B78980 /* AdditionalPreferencesViews.swift */; };
+		9DC184332EEE7E1D00B78980 /* PreferencesWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842B2EEE7E1D00B78980 /* PreferencesWindow.swift */; };
+		9DC184342EEE7E1D00B78980 /* VaultsPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842C2EEE7E1D00B78980 /* VaultsPreferencesView.swift */; };
+		9DC184352EEE7E1D00B78980 /* SyncProgressWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842E2EEE7E1D00B78980 /* SyncProgressWindow.swift */; };
+		9DC184362EEE7E1D00B78980 /* GeneralPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842A2EEE7E1D00B78980 /* GeneralPreferencesView.swift */; };
 		AA0001 /* SupersidianApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0001 /* SupersidianApp.swift */; };
 		AA0002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0002 /* AppDelegate.swift */; };
 		AA0003 /* BridgeStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0003 /* BridgeStatus.swift */; };
@@ -24,6 +32,14 @@
 /* Begin PBXFileReference section */
 		9DC1841C2EEE76E200B78980 /* SyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SyncCoordinator.swift; path = ViewModels/SyncCoordinator.swift; sourceTree = "<group>"; };
 		9DC1841E2EEE772700B78980 /* SyncProgressWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SyncProgressWindow.swift; path = Views/Sync/SyncProgressWindow.swift; sourceTree = "<group>"; };
+		9DC184202EEE7AFB00B78980 /* AppConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
+		9DC184242EEE7DDF00B78980 /* PreferencesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesViewModel.swift; sourceTree = "<group>"; };
+		9DC184252EEE7DDF00B78980 /* SyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCoordinator.swift; sourceTree = "<group>"; };
+		9DC184292EEE7E1D00B78980 /* AdditionalPreferencesViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdditionalPreferencesViews.swift; sourceTree = "<group>"; };
+		9DC1842A2EEE7E1D00B78980 /* GeneralPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralPreferencesView.swift; sourceTree = "<group>"; };
+		9DC1842B2EEE7E1D00B78980 /* PreferencesWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindow.swift; sourceTree = "<group>"; };
+		9DC1842C2EEE7E1D00B78980 /* VaultsPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultsPreferencesView.swift; sourceTree = "<group>"; };
+		9DC1842E2EEE7E1D00B78980 /* SyncProgressWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncProgressWindow.swift; sourceTree = "<group>"; };
 		BB0001 /* SupersidianApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersidianApp.swift; sourceTree = "<group>"; };
 		BB0002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB0003 /* BridgeStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStatus.swift; sourceTree = "<group>"; };
@@ -50,6 +66,51 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9DC184262EEE7DDF00B78980 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				9DC184242EEE7DDF00B78980 /* PreferencesViewModel.swift */,
+				9DC184252EEE7DDF00B78980 /* SyncCoordinator.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		9DC1842D2EEE7E1D00B78980 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				9DC184292EEE7E1D00B78980 /* AdditionalPreferencesViews.swift */,
+				9DC1842A2EEE7E1D00B78980 /* GeneralPreferencesView.swift */,
+				9DC1842B2EEE7E1D00B78980 /* PreferencesWindow.swift */,
+				9DC1842C2EEE7E1D00B78980 /* VaultsPreferencesView.swift */,
+			);
+			path = Preferences;
+			sourceTree = "<group>";
+		};
+		9DC1842F2EEE7E1D00B78980 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				9DC1842E2EEE7E1D00B78980 /* SyncProgressWindow.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		9DC184302EEE7E1D00B78980 /* Welcome */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Welcome;
+			sourceTree = "<group>";
+		};
+		9DC184312EEE7E1D00B78980 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				9DC1842D2EEE7E1D00B78980 /* Preferences */,
+				9DC1842F2EEE7E1D00B78980 /* Sync */,
+				9DC184302EEE7E1D00B78980 /* Welcome */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		FF0001 = {
 			isa = PBXGroup;
 			children = (
@@ -62,6 +123,8 @@
 		FF0002 /* Supersidian */ = {
 			isa = PBXGroup;
 			children = (
+				9DC184312EEE7E1D00B78980 /* Views */,
+				9DC184262EEE7DDF00B78980 /* ViewModels */,
 				9DC1841E2EEE772700B78980 /* SyncProgressWindow.swift */,
 				9DC1841C2EEE76E200B78980 /* SyncCoordinator.swift */,
 				FF0005 /* App */,
@@ -99,6 +162,7 @@
 		FF0006 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				9DC184202EEE7AFB00B78980 /* AppConfiguration.swift */,
 				BB0003 /* BridgeStatus.swift */,
 			);
 			path = Models;
@@ -239,7 +303,15 @@
 				9DC1841D2EEE76E200B78980 /* SyncCoordinator.swift in Sources */,
 				AA0002 /* AppDelegate.swift in Sources */,
 				AA0003 /* BridgeStatus.swift in Sources */,
+				9DC184322EEE7E1D00B78980 /* AdditionalPreferencesViews.swift in Sources */,
+				9DC184332EEE7E1D00B78980 /* PreferencesWindow.swift in Sources */,
+				9DC184342EEE7E1D00B78980 /* VaultsPreferencesView.swift in Sources */,
+				9DC184352EEE7E1D00B78980 /* SyncProgressWindow.swift in Sources */,
+				9DC184362EEE7E1D00B78980 /* GeneralPreferencesView.swift in Sources */,
 				AA0004 /* DatabaseManager.swift in Sources */,
+				9DC184212EEE7AFB00B78980 /* AppConfiguration.swift in Sources */,
+				9DC184272EEE7DDF00B78980 /* PreferencesViewModel.swift in Sources */,
+				9DC184282EEE7DDF00B78980 /* SyncCoordinator.swift in Sources */,
 				AA0005 /* ConfigurationManager.swift in Sources */,
 				AA0006 /* SupersidianRunner.swift in Sources */,
 				AA0007 /* NotificationManager.swift in Sources */,
