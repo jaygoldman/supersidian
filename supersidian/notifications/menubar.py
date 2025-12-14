@@ -118,15 +118,16 @@ class MenubarProvider(BaseNotificationProvider):
 
         Returns one of: 'success', 'warning', 'error', 'syncing'
         """
-        # Check for structural errors first
-        if payload.has_errors:
+        # Check for structural errors (missing paths, etc.)
+        if payload.supernote_missing or payload.vault_missing:
             return "error"
 
-        # Check if conversion had issues
-        if payload.no_text > 0:
+        # Check for tool issues (these are actual problems)
+        if payload.tool_missing > 0 or payload.tool_failed > 0:
             return "warning"
 
-        # All good
+        # Notes with no text are normal (blank notes, drawings, etc.)
+        # Consider the sync successful
         return "success"
 
     def _get_task_counts(self, bridge_name: str) -> tuple[int, int, int]:

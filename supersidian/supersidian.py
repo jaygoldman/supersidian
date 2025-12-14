@@ -974,6 +974,20 @@ def export_status_json() -> dict:
     }
 
 
+def send_sync_start_notification() -> None:
+    """Send Darwin notification to menubar app that sync is starting."""
+    try:
+        subprocess.run(
+            ["notify_post", "com.supersidian.sync.start"],
+            check=False,
+            capture_output=True,
+            timeout=1,
+        )
+    except Exception:
+        # Non-critical if it fails
+        pass
+
+
 def main() -> None:
     global VERBOSE
 
@@ -1016,6 +1030,9 @@ def main() -> None:
 
     # Ping healthcheck at start of run, if configured
     ping_healthcheck("/start")
+
+    # Notify menubar app that sync is starting
+    send_sync_start_notification()
 
     errorish = False
     try:
