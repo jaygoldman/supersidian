@@ -17,7 +17,7 @@ Native macOS menubar application for monitoring and controlling Supersidian sync
 ### Communication
 
 - **SQLite Database:** Python writes, Swift reads (read-only mode)
-- **Darwin Notifications:** Python signals sync completion via `notify_post`
+- **Darwin Notifications:** Python signals sync completion via `notifyutil`
 - **Process Execution:** Swift can trigger Python sync via `subprocess`
 
 ### Project Structure

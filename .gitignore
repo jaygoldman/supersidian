@@ -27,5 +27,12 @@ dist/
 # --- Logs ---
 *.log
 
-# --- LLM Plans ---
+# --- LLM Plans and Agent Files ---
 *_PLAN.md
+WARP.md
+# Xcode user state (ignore)
+SupersidianApp/**/xcuserdata/
+*.xcuserstate
+DerivedData/
+# Local logs
+supersidian.log*

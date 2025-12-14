@@ -1,0 +1,480 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		9DC1841D2EEE76E200B78980 /* SyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1841C2EEE76E200B78980 /* SyncCoordinator.swift */; };
+		9DC1841F2EEE772700B78980 /* SyncProgressWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1841E2EEE772700B78980 /* SyncProgressWindow.swift */; };
+		AA0001 /* SupersidianApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0001 /* SupersidianApp.swift */; };
+		AA0002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0002 /* AppDelegate.swift */; };
+		AA0003 /* BridgeStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0003 /* BridgeStatus.swift */; };
+		AA0004 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0004 /* DatabaseManager.swift */; };
+		AA0005 /* ConfigurationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0005 /* ConfigurationManager.swift */; };
+		AA0006 /* SupersidianRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0006 /* SupersidianRunner.swift */; };
+		AA0007 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0007 /* NotificationManager.swift */; };
+		AA0008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB0008 /* Assets.xcassets */; };
+		AA0009 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = DD0001 /* SQLite */; };
+		AA0010 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = DD0002 /* Sparkle */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		9DC1841C2EEE76E200B78980 /* SyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SyncCoordinator.swift; path = ViewModels/SyncCoordinator.swift; sourceTree = "<group>"; };
+		9DC1841E2EEE772700B78980 /* SyncProgressWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SyncProgressWindow.swift; path = Views/Sync/SyncProgressWindow.swift; sourceTree = "<group>"; };
+		BB0001 /* SupersidianApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersidianApp.swift; sourceTree = "<group>"; };
+		BB0002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		BB0003 /* BridgeStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStatus.swift; sourceTree = "<group>"; };
+		BB0004 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		BB0005 /* ConfigurationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationManager.swift; sourceTree = "<group>"; };
+		BB0006 /* SupersidianRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersidianRunner.swift; sourceTree = "<group>"; };
+		BB0007 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		BB0008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB0009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB0010 /* Supersidian.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Supersidian.entitlements; sourceTree = "<group>"; };
+		CC0001 /* Supersidian.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Supersidian.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		EE0001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0009 /* SQLite in Frameworks */,
+				AA0010 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		FF0001 = {
+			isa = PBXGroup;
+			children = (
+				FF0002 /* Supersidian */,
+				FF0003 /* Tests */,
+				FF0004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FF0002 /* Supersidian */ = {
+			isa = PBXGroup;
+			children = (
+				9DC1841E2EEE772700B78980 /* SyncProgressWindow.swift */,
+				9DC1841C2EEE76E200B78980 /* SyncCoordinator.swift */,
+				FF0005 /* App */,
+				FF0006 /* Models */,
+				FF0007 /* Services */,
+				FF0008 /* Resources */,
+			);
+			path = Supersidian;
+			sourceTree = "<group>";
+		};
+		FF0003 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		FF0004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				CC0001 /* Supersidian.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FF0005 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BB0001 /* SupersidianApp.swift */,
+				BB0002 /* AppDelegate.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		FF0006 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB0003 /* BridgeStatus.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		FF0007 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				FF0009 /* Database */,
+				FF0010 /* Configuration */,
+				FF0011 /* Supersidian */,
+				FF0012 /* Notifications */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		FF0008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BB0008 /* Assets.xcassets */,
+				BB0009 /* Info.plist */,
+				BB0010 /* Supersidian.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		FF0009 /* Database */ = {
+			isa = PBXGroup;
+			children = (
+				BB0004 /* DatabaseManager.swift */,
+			);
+			path = Database;
+			sourceTree = "<group>";
+		};
+		FF0010 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				BB0005 /* ConfigurationManager.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		FF0011 /* Supersidian */ = {
+			isa = PBXGroup;
+			children = (
+				BB0006 /* SupersidianRunner.swift */,
+			);
+			path = Supersidian;
+			sourceTree = "<group>";
+		};
+		FF0012 /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				BB0007 /* NotificationManager.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		GG0001 /* Supersidian */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = HH0001 /* Build configuration list for PBXNativeTarget "Supersidian" */;
+			buildPhases = (
+				GG0002 /* Sources */,
+				EE0001 /* Frameworks */,
+				GG0003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Supersidian;
+			packageProductDependencies = (
+				DD0001 /* SQLite */,
+				DD0002 /* Sparkle */,
+			);
+			productName = Supersidian;
+			productReference = CC0001 /* Supersidian.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		II0001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					GG0001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = HH0002 /* Build configuration list for PBXProject "SupersidianMac" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = FF0001;
+			packageReferences = (
+				DD0003 /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+				DD0004 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
+			productRefGroup = FF0004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				GG0001 /* Supersidian */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		GG0003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0008 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		GG0002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0001 /* SupersidianApp.swift in Sources */,
+				9DC1841F2EEE772700B78980 /* SyncProgressWindow.swift in Sources */,
+				9DC1841D2EEE76E200B78980 /* SyncCoordinator.swift in Sources */,
+				AA0002 /* AppDelegate.swift in Sources */,
+				AA0003 /* BridgeStatus.swift in Sources */,
+				AA0004 /* DatabaseManager.swift in Sources */,
+				AA0005 /* ConfigurationManager.swift in Sources */,
+				AA0006 /* SupersidianRunner.swift in Sources */,
+				AA0007 /* NotificationManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		JJ0001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		JJ0002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		JJ0003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Supersidian/Resources/Supersidian.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Supersidian/Resources/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Appetizer Labs. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.appetizerlabs.supersidian;
+				PRODUCT_NAME = Supersidian;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		JJ0004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Supersidian/Resources/Supersidian.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Supersidian/Resources/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Appetizer Labs. All rights reserved.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.appetizerlabs.supersidian;
+				PRODUCT_NAME = Supersidian;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		HH0001 /* Build configuration list for PBXNativeTarget "Supersidian" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				JJ0003 /* Debug */,
+				JJ0004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		HH0002 /* Build configuration list for PBXProject "SupersidianMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				JJ0001 /* Debug */,
+				JJ0002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DD0003 /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.3;
+			};
+		};
+		DD0004 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DD0001 /* SQLite */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD0003 /* XCRemoteSwiftPackageReference "SQLite.swift" */;
+			productName = SQLite;
+		};
+		DD0002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DD0004 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = II0001 /* Project object */;
+}

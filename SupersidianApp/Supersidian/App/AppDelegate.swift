@@ -22,6 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // State
     private var currentState: MenubarState = .idle
     private var bridges: [BridgeStatus] = []
+    private var syncWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon - menubar only app
@@ -239,25 +240,44 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Actions
 
     @objc private func syncNowClicked() {
-        updateMenubarIcon(for: .syncing)
-
-        Task {
-            do {
-                try await supersidianRunner.runSync()
-                NSLog("Sync completed successfully")
-
-                // Refresh state from database to get latest status
-                refreshState()
-            } catch {
-                NSLog("Sync failed: \(error.localizedDescription)")
-                updateMenubarIcon(for: .error)
-                notificationManager.sendErrorNotification(
-                    title: "Sync Failed",
-                    message: error.localizedDescription
-                )
-                // Error icon persists until next successful sync
-            }
+        // Prevent duplicate syncs
+        if syncWindow != nil {
+            NSLog("Sync window already open")
+            syncWindow?.makeKeyAndOrderFront(nil)
+            return
         }
+        
+        // Create and show sync progress window
+        let progressView = SyncProgressWindow()
+        let hostingController = NSHostingController(rootView: progressView)
+        
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Sync Progress"
+        window.contentViewController = hostingController
+        window.center()
+        window.isReleasedWhenClosed = false
+        
+        // Handle window close
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.syncWindow = nil
+            // Refresh state after window closes
+            self?.refreshState()
+        }
+        
+        syncWindow = window
+        window.makeKeyAndOrderFront(nil)
+        
+        // Update icon to syncing state
+        updateMenubarIcon(for: .syncing)
     }
 
     @objc private func openPreferences() {

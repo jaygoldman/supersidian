@@ -45,20 +45,20 @@ class SupersidianRunner {
     }
 
     // MARK: - Running Sync
-
+    
     func runSync() async throws {
         guard let executable = findSupersidianExecutable() else {
             throw SupersidianError.executableNotFound
         }
-
+        
         let process = Process()
-
+        
         if executable.hasSuffix("python3") {
             // Running via Python module
             guard let projectRoot = configManager.getProjectRoot() else {
                 throw SupersidianError.projectNotFound
             }
-
+            
             process.executableURL = URL(fileURLWithPath: executable)
             process.arguments = ["-m", "supersidian.supersidian"]
             process.currentDirectoryURL = projectRoot
@@ -67,21 +67,107 @@ class SupersidianRunner {
             process.executableURL = URL(fileURLWithPath: executable)
             process.arguments = []
         }
-
+        
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.standardOutput = outputPipe
         process.standardError = errorPipe
-
+        
         do {
             try process.run()
             process.waitUntilExit()
-
+            
             if process.terminationStatus != 0 {
                 let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                 let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
                 throw SupersidianError.syncFailed(errorMessage)
             }
+        } catch let error as SupersidianError {
+            throw error
+        } catch {
+            throw SupersidianError.executionFailed(error)
+        }
+    }
+    
+    // MARK: - Running Sync with Streaming Output
+    
+    func runSyncWithOutput(lineHandler: @escaping @Sendable (String) async -> Void) async throws {
+        guard let executable = findSupersidianExecutable() else {
+            throw SupersidianError.executableNotFound
+        }
+        
+        let process = Process()
+        
+        if executable.hasSuffix("python3") {
+            // Running via Python module with verbose output
+            guard let projectRoot = configManager.getProjectRoot() else {
+                throw SupersidianError.projectNotFound
+            }
+            
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = ["-m", "supersidian.supersidian", "--verbose"]
+            process.currentDirectoryURL = projectRoot
+        } else {
+            // Running via installed command with verbose output
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = ["--verbose"]
+        }
+        
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+        
+        // Stream stdout
+        let outputHandle = outputPipe.fileHandleForReading
+        outputHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
+                Task {
+                    await lineHandler(output)
+                }
+            }
+        }
+        
+        // Stream stderr
+        let errorHandle = errorPipe.fileHandleForReading
+        errorHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
+                Task {
+                    await lineHandler(output)
+                }
+            }
+        }
+        
+        do {
+            try process.run()
+            
+            // Wait for process to complete
+            await withCheckedContinuation { continuation in
+                process.terminationHandler = { _ in
+                    continuation.resume()
+                }
+            }
+            
+            // Stop reading handlers
+            outputHandle.readabilityHandler = nil
+            errorHandle.readabilityHandler = nil
+            
+            // Check if process was cancelled
+            try Task.checkCancellation()
+            
+            if process.terminationStatus != 0 {
+                let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                let errorMessage = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+                throw SupersidianError.syncFailed(errorMessage)
+            }
+        } catch is CancellationError {
+            // Kill process if task was cancelled
+            if process.isRunning {
+                process.terminate()
+            }
+            throw CancellationError()
         } catch let error as SupersidianError {
             throw error
         } catch {

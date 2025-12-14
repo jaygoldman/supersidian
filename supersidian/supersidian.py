@@ -978,7 +978,7 @@ def send_sync_start_notification() -> None:
     """Send Darwin notification to menubar app that sync is starting."""
     try:
         subprocess.run(
-            ["notify_post", "com.supersidian.sync.start"],
+            ["notifyutil", "-p", "com.supersidian.sync.start"],
             check=False,
             capture_output=True,
             timeout=1,

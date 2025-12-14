@@ -32,7 +32,7 @@ class MenubarProvider(BaseNotificationProvider):
     Features:
     - Updates bridge_status table with current state
     - Appends to sync_history for historical tracking
-    - Sends Darwin notification via notify_post
+    - Sends Darwin notification via notifyutil
     - Calculates task counts from tasks table
     - Determines status based on errors and conversion results
 
@@ -282,17 +282,17 @@ class MenubarProvider(BaseNotificationProvider):
     def _post_darwin_notification(self) -> None:
         """Post a Darwin notification to wake up the menubar app.
 
-        Uses the notify_post utility which is available on all macOS systems.
+        Uses the notifyutil utility which is available on all macOS systems.
         If the utility is not found or fails, we log but don't fail the entire
         notification (database updates still succeeded).
         """
         try:
             subprocess.run(
-                ["notify_post", "com.supersidian.sync.complete"],
+                ["notifyutil", "-p", "com.supersidian.sync.complete"],
                 check=False,
                 capture_output=True,
                 timeout=1,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
             # Log but don't fail - the database is already updated
-            log.debug(f"notify_post failed (non-critical): {e}")
+            log.debug(f"notifyutil failed (non-critical): {e}")
