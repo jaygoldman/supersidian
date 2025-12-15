@@ -179,18 +179,51 @@ struct BridgeConfig: Codable, Identifiable, Equatable, Hashable {
 
     var id: String { name }
 
+    // CodingKeys without explicit rawValues - let convertFromSnakeCase handle the mapping
     enum CodingKeys: String, CodingKey {
         case name
         case enabled
-        case supernoteSubdir = "supernote_subdir"
-        case supernotePath = "supernote_path"
-        case vaultPath = "vault_path"
-        case defaultTags = "default_tags"
-        case extraTags = "extra_tags"
-        case aggressiveCleanup = "aggressive_cleanup"
+        case supernoteSubdir
+        case supernotePath
+        case vaultPath
+        case defaultTags
+        case extraTags
+        case aggressiveCleanup
         case spellcheck
-        case exportImages = "export_images"
-        case imagesSubdir = "images_subdir"
+        case exportImages
+        case imagesSubdir
+    }
+
+    // Custom decoder to handle missing fields with defaults
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        name = try container.decode(String.self, forKey: .name)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        supernoteSubdir = try container.decode(String.self, forKey: .supernoteSubdir)
+        supernotePath = try container.decodeIfPresent(String.self, forKey: .supernotePath) ?? ""
+        vaultPath = try container.decode(String.self, forKey: .vaultPath)
+        defaultTags = try container.decodeIfPresent([String].self, forKey: .defaultTags) ?? []
+        extraTags = try container.decodeIfPresent([String].self, forKey: .extraTags) ?? []
+        aggressiveCleanup = try container.decodeIfPresent(Bool.self, forKey: .aggressiveCleanup) ?? false
+        spellcheck = try container.decodeIfPresent(Bool.self, forKey: .spellcheck) ?? false
+        exportImages = try container.decodeIfPresent(Bool.self, forKey: .exportImages) ?? true
+        imagesSubdir = try container.decodeIfPresent(String.self, forKey: .imagesSubdir) ?? "Supersidian/Assets"
+    }
+
+    // Regular init for programmatic creation
+    init(name: String, enabled: Bool, supernoteSubdir: String, supernotePath: String, vaultPath: String, defaultTags: [String], extraTags: [String], aggressiveCleanup: Bool, spellcheck: Bool, exportImages: Bool, imagesSubdir: String) {
+        self.name = name
+        self.enabled = enabled
+        self.supernoteSubdir = supernoteSubdir
+        self.supernotePath = supernotePath
+        self.vaultPath = vaultPath
+        self.defaultTags = defaultTags
+        self.extraTags = extraTags
+        self.aggressiveCleanup = aggressiveCleanup
+        self.spellcheck = spellcheck
+        self.exportImages = exportImages
+        self.imagesSubdir = imagesSubdir
     }
 }
 
@@ -209,6 +242,7 @@ enum ConfigurationError: LocalizedError {
     case vaultPathNotFound(String, String)
     case missingTodoistToken
     case missingWebhookUrl
+    case missingHealthcheckUrl
     
     var errorDescription: String? {
         switch self {
@@ -236,6 +270,8 @@ enum ConfigurationError: LocalizedError {
             return "Todoist API token is required when Todoist provider is enabled"
         case .missingWebhookUrl:
             return "Webhook URL is required when webhook notifications are enabled"
+        case .missingHealthcheckUrl:
+            return "Healthcheck URL is required when healthcheck is enabled"
         }
     }
 }
@@ -244,18 +280,21 @@ enum ConfigurationError: LocalizedError {
 
 extension BridgeConfig {
     func validate() throws {
+        // Skip validation for disabled bridges
+        guard enabled else { return }
+
         guard !name.isEmpty else {
             throw ConfigurationError.invalidBridgeName
         }
-        
+
         guard !supernoteSubdir.isEmpty else {
             throw ConfigurationError.missingSupernoteSubdir(name)
         }
-        
+
         guard !vaultPath.isEmpty else {
             throw ConfigurationError.missingVaultPath(name)
         }
-        
+
         let vaultURL = URL(fileURLWithPath: (vaultPath as NSString).expandingTildeInPath)
         guard FileManager.default.fileExists(atPath: vaultURL.path) else {
             throw ConfigurationError.vaultPathNotFound(name, vaultPath)

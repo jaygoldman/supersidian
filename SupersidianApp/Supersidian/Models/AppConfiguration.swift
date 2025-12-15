@@ -31,6 +31,7 @@ struct AppConfiguration: Codable, Equatable {
     var webhookNotifications: String  // "all", "errors", "none"
     
     // Healthcheck
+    var healthcheckEnabled: Bool
     var healthcheckUrl: String?
     
     // Advanced
@@ -49,6 +50,7 @@ struct AppConfiguration: Codable, Equatable {
         self.webhookUrl = nil
         self.webhookTopic = nil
         self.webhookNotifications = "errors"
+        self.healthcheckEnabled = false
         self.healthcheckUrl = nil
         self.supernoteTool = nil
     }
@@ -89,6 +91,13 @@ struct AppConfiguration: Codable, Equatable {
                 throw ConfigurationError.missingWebhookUrl
             }
         }
+
+        // Validate healthcheck settings
+        if healthcheckEnabled {
+            guard let url = healthcheckUrl, !url.isEmpty else {
+                throw ConfigurationError.missingHealthcheckUrl
+            }
+        }
     }
     
     // MARK: - Conversion to .env
@@ -121,8 +130,8 @@ struct AppConfiguration: Codable, Equatable {
         }
         
         env["SUPERSIDIAN_WEBHOOK_NOTIFICATIONS"] = webhookNotifications
-        
-        if let url = healthcheckUrl {
+
+        if healthcheckEnabled, let url = healthcheckUrl {
             env["SUPERSIDIAN_HEALTHCHECK_URL"] = url
         }
         

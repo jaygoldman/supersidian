@@ -57,6 +57,12 @@ class PreferencesViewModel: ObservableObject {
             config.webhookTopic = envVars["SUPERSIDIAN_WEBHOOK_TOPIC"]
             config.webhookNotifications = envVars["SUPERSIDIAN_WEBHOOK_NOTIFICATIONS"] ?? "errors"
             config.healthcheckUrl = envVars["SUPERSIDIAN_HEALTHCHECK_URL"]
+
+            // For backward compatibility: if healthcheck URL exists, enable it
+            if let healthcheckUrl = config.healthcheckUrl, !healthcheckUrl.isEmpty {
+                config.healthcheckEnabled = true
+            }
+
             config.supernoteTool = envVars["SUPERSIDIAN_SUPERNOTE_TOOL"]
         }
         

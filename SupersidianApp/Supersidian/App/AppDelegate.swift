@@ -287,23 +287,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        
+
         // Create preferences window
         let prefsView = PreferencesWindow()
         let hostingController = NSHostingController(rootView: prefsView)
-        
+
+        // Calculate centered position on screen
+        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let windowFrame = NSRect(
+            x: (screenFrame.width - 900) / 2 + screenFrame.origin.x,
+            y: (screenFrame.height - 650) / 2 + screenFrame.origin.y,
+            width: 900,
+            height: 650
+        )
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            contentRect: windowFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Supersidian Preferences"
         window.contentViewController = hostingController
-        window.center()
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 700, height: 500)
-        
+        window.minSize = NSSize(width: 850, height: 600)
+        window.maxSize = NSSize(width: 1400, height: 1000)
+
         // Handle window close
         NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -312,7 +321,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             self?.preferencesWindow = nil
         }
-        
+
         preferencesWindow = window
         window.makeKeyAndOrderFront(nil)
     }

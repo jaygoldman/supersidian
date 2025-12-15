@@ -17,6 +17,7 @@
 		9DC184342EEE7E1D00B78980 /* VaultsPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842C2EEE7E1D00B78980 /* VaultsPreferencesView.swift */; };
 		9DC184352EEE7E1D00B78980 /* SyncProgressWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842E2EEE7E1D00B78980 /* SyncProgressWindow.swift */; };
 		9DC184362EEE7E1D00B78980 /* GeneralPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC1842A2EEE7E1D00B78980 /* GeneralPreferencesView.swift */; };
+		9DC184382EEF2E5000B78980 /* HealthcheckPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC184372EEF2E5000B78980 /* HealthcheckPreferencesView.swift */; };
 		AA0001 /* SupersidianApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0001 /* SupersidianApp.swift */; };
 		AA0002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0002 /* AppDelegate.swift */; };
 		AA0003 /* BridgeStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0003 /* BridgeStatus.swift */; };
@@ -40,6 +41,7 @@
 		9DC1842B2EEE7E1D00B78980 /* PreferencesWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindow.swift; sourceTree = "<group>"; };
 		9DC1842C2EEE7E1D00B78980 /* VaultsPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultsPreferencesView.swift; sourceTree = "<group>"; };
 		9DC1842E2EEE7E1D00B78980 /* SyncProgressWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncProgressWindow.swift; sourceTree = "<group>"; };
+		9DC184372EEF2E5000B78980 /* HealthcheckPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HealthcheckPreferencesView.swift; path = Preferences/HealthcheckPreferencesView.swift; sourceTree = "<group>"; };
 		BB0001 /* SupersidianApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupersidianApp.swift; sourceTree = "<group>"; };
 		BB0002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BB0003 /* BridgeStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeStatus.swift; sourceTree = "<group>"; };
@@ -104,6 +106,7 @@
 		9DC184312EEE7E1D00B78980 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				9DC184372EEF2E5000B78980 /* HealthcheckPreferencesView.swift */,
 				9DC1842D2EEE7E1D00B78980 /* Preferences */,
 				9DC1842F2EEE7E1D00B78980 /* Sync */,
 				9DC184302EEE7E1D00B78980 /* Welcome */,
@@ -302,6 +305,7 @@
 				9DC1841F2EEE772700B78980 /* SyncProgressWindow.swift in Sources */,
 				9DC1841D2EEE76E200B78980 /* SyncCoordinator.swift in Sources */,
 				AA0002 /* AppDelegate.swift in Sources */,
+				9DC184382EEF2E5000B78980 /* HealthcheckPreferencesView.swift in Sources */,
 				AA0003 /* BridgeStatus.swift in Sources */,
 				9DC184322EEE7E1D00B78980 /* AdditionalPreferencesViews.swift in Sources */,
 				9DC184332EEE7E1D00B78980 /* PreferencesWindow.swift in Sources */,
