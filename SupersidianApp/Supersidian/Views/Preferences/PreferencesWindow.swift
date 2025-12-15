@@ -56,7 +56,11 @@ enum AppSection: String, Identifiable {
 
 struct PreferencesWindow: View {
     @StateObject private var viewModel = PreferencesViewModel()
-    @State private var selectedSection: AppSection = .general
+    @State private var selectedSection: AppSection
+    
+    init(initialSection: AppSection = .general) {
+        _selectedSection = State(initialValue: initialSection)
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {

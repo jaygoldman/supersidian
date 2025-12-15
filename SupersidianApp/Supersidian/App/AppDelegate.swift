@@ -260,8 +260,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Create unified window
-        let contentView = PreferencesWindow()
+        // Create unified window with initial section
+        let contentView = PreferencesWindow(initialSection: section)
         let hostingController = NSHostingController(rootView: contentView)
 
         // Calculate centered position on screen
@@ -299,12 +299,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         supersidianWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        
-        // Set initial section
-        NotificationCenter.default.post(
-            name: NSNotification.Name("SelectAppSection"),
-            object: section
-        )
     }
 
     @objc private func openAbout() {
