@@ -2,12 +2,13 @@
 //  PreferencesWindow.swift
 //  Supersidian
 //
-//  Main preferences window with System Settings-style sidebar.
+//  Main Supersidian window with Sync and Preferences sections.
 //
 
 import SwiftUI
 
-enum PreferenceSection: String, CaseIterable, Identifiable {
+enum AppSection: String, Identifiable {
+    case sync = "Sync"
     case general = "General"
     case vaults = "Vaults"
     case tasks = "Tasks"
@@ -19,6 +20,7 @@ enum PreferenceSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .sync: return "arrow.triangle.2.circlepath"
         case .general: return "gear"
         case .vaults: return "folder.badge.gearshape"
         case .tasks: return "checkmark.circle"
@@ -30,6 +32,8 @@ enum PreferenceSection: String, CaseIterable, Identifiable {
 
     var description: String {
         switch self {
+        case .sync:
+            return "Run sync and view live progress"
         case .general:
             return "Configure core settings like Supernote sync folder, logging, and preferences"
         case .vaults:
@@ -44,19 +48,33 @@ enum PreferenceSection: String, CaseIterable, Identifiable {
             return "Advanced options for power users"
         }
     }
+    
+    var isPreference: Bool {
+        self != .sync
+    }
 }
 
 struct PreferencesWindow: View {
     @StateObject private var viewModel = PreferencesViewModel()
-    @State private var selectedSection: PreferenceSection = .general
+    @State private var selectedSection: AppSection = .general
 
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
-            // Sidebar
-            List(PreferenceSection.allCases, selection: $selectedSection) { section in
-                Label(section.rawValue, systemImage: section.icon)
-                    .tag(section)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+            // Sidebar with grouped sections
+            List(selection: $selectedSection) {
+                // Sync section (ungrouped)
+                Section {
+                    Label(AppSection.sync.rawValue, systemImage: AppSection.sync.icon)
+                        .tag(AppSection.sync)
+                }
+                
+                // Preferences group
+                Section("Preferences") {
+                    ForEach([AppSection.general, .vaults, .tasks, .healthcheck, .notifications, .advanced], id: \.self) { section in
+                        Label(section.rawValue, systemImage: section.icon)
+                            .tag(section)
+                    }
+                }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 250)
@@ -93,49 +111,52 @@ struct PreferencesWindow: View {
             .background(Color(nsColor: .windowBackgroundColor))
             .toolbar {
                 ToolbarItemGroup(placement: .automatic) {
-                    // Validation error indicator
-                    if let error = viewModel.validationError {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.red)
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Action buttons group
-                    HStack(spacing: 12) {
-                        // Unsaved indicator
-                        if viewModel.hasChanges {
-                            Text("Unsaved")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                                .padding(.leading, 12)
-                        }
-
-                        Button("Revert") {
-                            viewModel.revert()
-                        }
-                        .disabled(!viewModel.hasChanges)
-
-                        Button("Apply") {
-                            Task {
-                                do {
-                                    try await viewModel.apply()
-                                } catch {
-                                    // Error shown in validationError
-                                }
+                    // Only show preferences controls for preference sections
+                    if selectedSection.isPreference {
+                        // Validation error indicator
+                        if let error = viewModel.validationError {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
                             }
                         }
-                        .disabled(!viewModel.hasChanges || viewModel.isSaving)
-                        .keyboardShortcut(.defaultAction)
 
-                        if viewModel.isSaving {
-                            ProgressView()
-                                .scaleEffect(0.6)
+                        Spacer()
+
+                        // Action buttons group
+                        HStack(spacing: 12) {
+                            // Unsaved indicator
+                            if viewModel.hasChanges {
+                                Text("Unsaved")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                    .padding(.leading, 12)
+                            }
+
+                            Button("Revert") {
+                                viewModel.revert()
+                            }
+                            .disabled(!viewModel.hasChanges)
+
+                            Button("Apply") {
+                                Task {
+                                    do {
+                                        try await viewModel.apply()
+                                    } catch {
+                                        // Error shown in validationError
+                                    }
+                                }
+                            }
+                            .disabled(!viewModel.hasChanges || viewModel.isSaving)
+                            .keyboardShortcut(.defaultAction)
+
+                            if viewModel.isSaving {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                            }
                         }
                     }
                 }
@@ -146,13 +167,20 @@ struct PreferencesWindow: View {
         .onAppear {
             viewModel.load()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SelectAppSection"))) { notification in
+            if let section = notification.object as? AppSection {
+                selectedSection = section
+            }
+        }
     }
 
     // MARK: - Section Content
 
     @ViewBuilder
-    private func sectionContent(for section: PreferenceSection) -> some View {
+    private func sectionContent(for section: AppSection) -> some View {
         switch section {
+        case .sync:
+            SyncView()
         case .general:
             GeneralPreferencesView(viewModel: viewModel)
         case .vaults:

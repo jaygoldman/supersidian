@@ -22,8 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // State
     private var currentState: MenubarState = .idle
     private var bridges: [BridgeStatus] = []
-    private var syncWindow: NSWindow?
-    private var preferencesWindow: NSWindow?
+    private var supersidianWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Hide dock icon - menubar only app
@@ -241,56 +240,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Actions
 
     @objc private func syncNowClicked() {
-        // Prevent duplicate syncs
-        if syncWindow != nil {
-            NSLog("Sync window already open")
-            syncWindow?.makeKeyAndOrderFront(nil)
-            return
-        }
-        
-        // Create and show sync progress window
-        let progressView = SyncProgressWindow()
-        let hostingController = NSHostingController(rootView: progressView)
-        
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
-            styleMask: [.titled, .closable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Sync Progress"
-        window.contentViewController = hostingController
-        window.center()
-        window.isReleasedWhenClosed = false
-        
-        // Handle window close
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            self?.syncWindow = nil
-            // Refresh state after window closes
-            self?.refreshState()
-        }
-        
-        syncWindow = window
-        window.makeKeyAndOrderFront(nil)
-        
-        // Update icon to syncing state
-        updateMenubarIcon(for: .syncing)
+        openSupersidianWindow(section: .sync)
     }
 
     @objc private func openPreferences() {
+        openSupersidianWindow(section: .general)
+    }
+    
+    private func openSupersidianWindow(section: AppSection) {
         // Show existing window if already open
-        if let window = preferencesWindow {
+        if let window = supersidianWindow {
+            NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
+            // Update section if specified
+            NotificationCenter.default.post(
+                name: NSNotification.Name("SelectAppSection"),
+                object: section
+            )
             return
         }
 
-        // Create preferences window
-        let prefsView = PreferencesWindow()
-        let hostingController = NSHostingController(rootView: prefsView)
+        // Create unified window
+        let contentView = PreferencesWindow()
+        let hostingController = NSHostingController(rootView: contentView)
 
         // Calculate centered position on screen
         let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
@@ -307,7 +279,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Supersidian Preferences"
+        window.title = "Supersidian"
         window.contentViewController = hostingController
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 850, height: 600)
@@ -319,11 +291,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: window,
             queue: .main
         ) { [weak self] _ in
-            self?.preferencesWindow = nil
+            self?.supersidianWindow = nil
+            // Refresh state after window closes
+            self?.refreshState()
         }
 
-        preferencesWindow = window
+        supersidianWindow = window
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Set initial section
+        NotificationCenter.default.post(
+            name: NSNotification.Name("SelectAppSection"),
+            object: section
+        )
     }
 
     @objc private func openAbout() {
