@@ -124,7 +124,7 @@ struct VaultsPreferencesView: View {
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-                .help("Edit vault")
+                .help(Text("Edit vault"))
 
                 Button(role: .destructive) {
                     viewModel.deleteBridge(bridge)
@@ -133,7 +133,7 @@ struct VaultsPreferencesView: View {
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-                .help("Delete vault")
+                .help(Text("Delete vault"))
             }
         }
         .padding(16)
@@ -218,11 +218,12 @@ struct VaultEditorSheet: View {
                                 Toggle("", isOn: $editedBridge.enabled)
                                     .toggleStyle(.switch)
                                     .labelsHidden()
-                                    .help("Disable to temporarily stop syncing this vault")
+                                    .help(Text("Disable to temporarily stop syncing this vault"))
                             }
                         }
                     } label: {
                         Label("Basic Settings", systemImage: "gear")
+                            .font(.body)
                     }
 
                     // Paths
@@ -265,6 +266,7 @@ struct VaultEditorSheet: View {
                         }
                     } label: {
                         Label("Paths", systemImage: "folder")
+                            .font(.body)
                     }
 
                     // Options
@@ -333,6 +335,7 @@ struct VaultEditorSheet: View {
                         }
                     } label: {
                         Label("Options", systemImage: "slider.horizontal.3")
+                            .font(.body)
                     }
                 }
                 .padding(24)

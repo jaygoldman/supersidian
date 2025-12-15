@@ -25,7 +25,7 @@ struct TasksPreferencesView: View {
                 Text("None").tag("noop")
                 Text("Todoist").tag("todoist")
             }
-            .help("Where to sync tasks extracted from notes")
+            .help(Text("Where to sync tasks extracted from notes"))
             
             if viewModel.editedConfig.todoProvider == "todoist" {
                 Divider()
@@ -38,7 +38,7 @@ struct TasksPreferencesView: View {
                         viewModel.updateEdited(config)
                     }
                 ))
-                .help("Get your token from: https://todoist.com/prefs/integrations")
+                .help(Text("Get your token from: https://todoist.com/prefs/integrations"))
                 
                 Text("Your Todoist API token (kept secure in .env)")
                     .font(.caption)
@@ -72,7 +72,7 @@ struct NotificationsPreferencesView: View {
                         viewModel.updateEdited(config)
                     }
                 ))
-                .help("Update menubar app on sync completion")
+                .help(Text("Update menubar app on sync completion"))
                 
                 Toggle("Webhook", isOn: Binding(
                     get: { viewModel.editedConfig.notificationProviders.contains("webhook") },
@@ -88,7 +88,7 @@ struct NotificationsPreferencesView: View {
                         viewModel.updateEdited(config)
                     }
                 ))
-                .help("Send HTTP webhooks on sync events")
+                .help(Text("Send HTTP webhooks on sync events"))
             }
             
             if viewModel.editedConfig.notificationProviders.contains("webhook") {
@@ -101,7 +101,7 @@ struct NotificationsPreferencesView: View {
                             viewModel.updateEdited(config)
                         }
                     ))
-                    .help("e.g., https://ntfy.sh/your-topic")
+                    .help(Text("e.g., https://ntfy.sh/your-topic"))
                     
                     TextField("Topic (optional):", text: Binding(
                         get: { viewModel.editedConfig.webhookTopic ?? "" },
@@ -151,7 +151,7 @@ struct AdvancedPreferencesView: View {
                     Text("Dropbox").tag("dropbox")
                     Text("Local").tag("local")
                 }
-                .help("How Supersidian accesses your Supernote files")
+                .help(Text("How Supersidian accesses your Supernote files"))
                 
                 Picker("Note Provider:", selection: Binding(
                     get: { viewModel.editedConfig.noteProvider },
@@ -164,7 +164,7 @@ struct AdvancedPreferencesView: View {
                     Text("Obsidian").tag("obsidian")
                     Text("Markdown").tag("markdown")
                 }
-                .help("How notes are formatted and written")
+                .help(Text("How notes are formatted and written"))
             }
             
             Section("Healthcheck") {
@@ -176,7 +176,7 @@ struct AdvancedPreferencesView: View {
                         viewModel.updateEdited(config)
                     }
                 ))
-                .help("e.g., https://hc-ping.com/your-uuid")
+                .help(Text("e.g., https://hc-ping.com/your-uuid"))
                 
                 Text("For monitoring with healthchecks.io or similar")
                     .font(.caption)
@@ -192,7 +192,7 @@ struct AdvancedPreferencesView: View {
                         viewModel.updateEdited(config)
                     }
                 ))
-                .help("Custom path to supernote-tool binary")
+                .help(Text("Custom path to supernote-tool binary"))
                 
                 Text("Leave empty to use default (supernote-tool in PATH)")
                     .font(.caption)
