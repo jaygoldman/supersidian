@@ -153,15 +153,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         prefsItem.target = self
         menu?.addItem(prefsItem)
 
-        // About
-        let aboutItem = NSMenuItem(
-            title: "About Supersidian",
-            action: #selector(openAbout),
-            keyEquivalent: ""
-        )
-        aboutItem.target = self
-        menu?.addItem(aboutItem)
-
         menu?.addItem(NSMenuItem.separator())
 
         // Quit
@@ -299,10 +290,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         supersidianWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    @objc private func openAbout() {
-        NSApp.orderFrontStandardAboutPanel(nil)
     }
 
     @objc private func quitApp() {
